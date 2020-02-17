@@ -21,8 +21,9 @@ letter [_a-zA-Z]
 %%
 
 \/\/.*
+"/*".*"*/"
 ";"         {TOKEN(SEMI);}
-","         {return COMMA;}
+","         {TOKEN(COMMA);}
 "="         {TOKEN(ASSIGNOP);}
 ">"|"<"|">="|"<="|"=="|"!=" {return RELOP;}
 "+"         {TOKEN(PLUS);}
@@ -43,15 +44,20 @@ int|float {
 "]"         {TOKEN(RB);}
 "{"         {TOKEN(LC);}
 "}"         {TOKEN(RC);}
-"struct"    {return STRUCT;}
-"return"    {return RETURN;}
-"if"        {return IF;}
-"else"      {return ELSE;}
-"while"     {return WHILE;}
+"struct"    {TOKEN(STRUCT);}
+"return"    {TOKEN(RETURN);}
+"if"        {TOKEN(IF);}
+"else"      {TOKEN(ELSE);}
+"while"     {TOKEN(WHILE);}
 " "
 "\n"        {yycolumn = 1;}
 
-0|[1-9]{digit}* {
+0|([1-9]{digit}*)\.{digit}+ {
+    yylval = Singleton("FLOAT: %lf", atof(yytext));
+    return FLOAT;
+}
+
+0|([1-9]{digit}*) {
     yylval = Singleton("INT: %s", yytext);
     return INT;
 }
@@ -68,6 +74,6 @@ int|float {
     return ID;
 }
 
-. {printf("Error type A at Line %d: Mysterious characters \"%s\"\n", yylineno, yytext); return -1;}
+. {printf("Error type A at Line %d: Mysterious characters \"%s\"\n", yylineno, yytext);}
 
 %%
