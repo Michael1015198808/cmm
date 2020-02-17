@@ -1,37 +1,49 @@
+%{
+    #include "syntax.tab.h"
+    int yycolumn = 1;
+    #define YY_USER_ACTION \
+        yylloc.first_line = yylloc.last_line = yylineno; \
+        yylloc.first_column = yycolumn; \
+        yylloc.last_column = yycolumn + yyleng - 1; \
+        yycolumn += yyleng;
+%}
 digit [0-9]
 letter [_a-zA-Z]
 %option yylineno
 %%
 
 \/\/.*
-";" {puts("SEMI");}
-"," {puts("COMMA");}
-"=" {puts("ASSIGNOP");}
-">"|"<"|">="|"<="|"=="|"!=" {puts("RELOP");}
-"+" {puts("PLUS");}
-"-" {puts("MINUS");}
-"*" {puts("STAR");}
-"/" {puts("DIV");}
-"&&" {puts("AND");}
-"||" {puts("OR");}
-"." {puts("DOT");}
-"!" {puts("NOT");}
-int|float {puts("TYPE");}
-"(" {puts("LP");}
-")" {puts("RP");}
-"[" {puts("LB");}
-"]" {puts("RB");}
-"{" {puts("LC");}
-"}" {puts("RC");}
-"struct" {puts("STRUCT");}
-"return" {puts("RETURN");}
-"if" {puts("IF");}
-"else" {puts("ELSE");}
-"while" {puts("WHILE");}
+";" {return SEMI;}
+"," {return COMMA;}
+"=" {return ASSIGNOP;}
+">"|"<"|">="|"<="|"=="|"!=" {return RELOP;}
+"+" {return PLUS;}
+"-" {return MINUS;}
+"*" {return STAR;}
+"/" {return DIV;}
+"&&" {return AND;}
+"||" {return OR;}
+"." {return DOT;}
+"!" {return NOT;}
+int|float {return TYPE;}
+"(" {return LP;}
+")" {return RP;}
+"[" {return LB;}
+"]" {return RB;}
+"{" {return LC;}
+"}" {return RC;}
+"struct" {return STRUCT;}
+"return" {return RETURN;}
+"if" {return IF;}
+"else" {return ELSE;}
+"while" {return WHILE;}
 " "
-"\n"
+"\n" {yycolumn = 1;}
 
-{digit}+ {printf("INT:%d\n", atoi(yytext));}
+{digit}+ {
+    yylval.type_int = atoi(yytext);
+    return INT;
+    }
 {letter}({letter}|{digit})* {printf("ID:%s\n", yytext);}
 
 . {printf("Error type A at Line %d: Mysterious characters \"%s\"\n", yylineno, yytext);}

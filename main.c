@@ -2,6 +2,7 @@
 
 extern FILE* yyin;
 int yylex();
+int yyparse();
 
 int main(int argc, char** argv) {
     if(argc > 1) {
@@ -10,6 +11,11 @@ int main(int argc, char** argv) {
             return 1;
         }
     }
-    yylex();
+    yyparse();
     return 0;
+}
+
+int yyerror(char* msg) {
+    puts("ERROR");
+    puts(msg);
 }
