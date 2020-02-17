@@ -16,6 +16,5 @@ int main(int argc, char** argv) {
 }
 
 int yyerror(char* msg) {
-    puts("ERROR");
-    puts(msg);
+    return -1;
 }

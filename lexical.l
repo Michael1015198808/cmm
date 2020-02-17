@@ -44,8 +44,8 @@ int|float {return TYPE;}
     yylval.type_int = atoi(yytext);
     return INT;
     }
-{letter}({letter}|{digit})* {printf("ID:%s\n", yytext);}
+{letter}({letter}|{digit})* {return ID;}
 
-. {printf("Error type A at Line %d: Mysterious characters \"%s\"\n", yylineno, yytext);}
+. {printf("Error type A at Line %d: Mysterious characters \"%s\"\n", yylineno, yytext); return -1;}
 
 %%
