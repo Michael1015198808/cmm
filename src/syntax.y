@@ -98,6 +98,7 @@ ParamDec :
 
 CompSt :
     LC DefList StmtList RC  {$$ = Node4("CompSt");}
+  | error RC                {$$ = Node1("CompSt");}
   ;
 StmtList :
     Stmt StmtList   {$$ = Node2("StmtList");}
@@ -110,6 +111,7 @@ Stmt :
   | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {$$ = Node5("Stmt");}
   | IF LP Exp RP Stmt ELSE Stmt             {$$ = Node7("Stmt");}
   | WHILE LP Exp RP Stmt                    {$$ = Node5("Stmt");}
+  | error SEMI                              {$$ = Node1("Stmt");}
   ;
 
 DefList :
@@ -148,6 +150,7 @@ Exp :
   | ID                  {$$ = Node1("Exp");}
   | INT                 {$$ = Node1("Exp");}
   | FLOAT               {$$ = Node1("Exp");}
+  | error RP            {$$ = Node1("Exp");}
   ;
 Args :
     Exp COMMA Args  {$$ = Node3("Args");}

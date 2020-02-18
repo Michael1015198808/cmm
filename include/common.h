@@ -5,6 +5,7 @@
 #define YYSTYPE node*
 
 extern FILE* yyin;
+int yylineno;
 int yylex();
 int yyparse();
 int yyerror(char* msg);
@@ -43,3 +44,10 @@ static inline node* Singleton(const char* fmt, ...) {
     extern int yylineno;
     return Node(buf, yylineno, 0);
 }
+
+typedef struct error {
+    char* msg;
+    int lineno;
+    char type;
+} error;
+int cmm_error(error);

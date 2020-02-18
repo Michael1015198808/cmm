@@ -1,6 +1,7 @@
 #include "common.h"
 
 void preorder(node*);
+int error_cnt = 0;
 int main(int argc, char** argv) {
     if(argc > 1) {
         if(!(yyin = fopen(argv[1], "r"))) {
@@ -9,13 +10,25 @@ int main(int argc, char** argv) {
         }
     }
     yyparse();
-    preorder(root);
+    if(!error_cnt) {
+        preorder(root);
+    }
     return 0;
 }
 
-int yyerror(char* msg) {
-    return -1;
+int cmm_error(error e) {
+    ++error_cnt;
+    printf("Error type %c at Line %d: %s\n", e.type, e.lineno, e.msg);
 }
+
+int yyerror(char* msg) {
+    error e;
+    e.type = 'B';
+    e.lineno = yylineno;
+    e.msg = msg;
+    cmm_error(e);
+}
+
 void preorder(node* cur) {
     static int indent = 0;
     if(indent)
