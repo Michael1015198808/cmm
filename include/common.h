@@ -1,3 +1,6 @@
+#ifndef __COMMON_H__
+#define __COMMON_H__
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -51,3 +54,5 @@ typedef struct error {
     char type;
 } error;
 int cmm_error(error);
+
+#endif
