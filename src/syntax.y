@@ -98,7 +98,6 @@ ParamDec :
 
 CompSt :
     LC DefList StmtList RC  {$$ = Node4("CompSt");}
-  | error RC                {$$ = Node1("CompSt");}
   ;
 StmtList :
     Stmt StmtList   {$$ = Node2("StmtList");}
@@ -150,7 +149,6 @@ Exp :
   | ID                  {$$ = Node1("Exp");}
   | INT                 {$$ = Node1("Exp");}
   | FLOAT               {$$ = Node1("Exp");}
-  | error RP            {$$ = Node1("Exp");}
   ;
 Args :
     Exp COMMA Args  {$$ = Node3("Args");}
