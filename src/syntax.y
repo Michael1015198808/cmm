@@ -44,6 +44,7 @@
 
 
 %%
+//High-level Definitions
 Program :
     ExtDefList {
         $$ = Node1("Program");
@@ -64,6 +65,7 @@ ExtDecList :
   | VarDec COMMA ExtDecList {$$ = Node3("ExtDecList");}
   ;
 
+//Specifiers
 Specifier :
     TYPE                {$$ = Node1("Specifier");}
   | StructSpecifier     {$$ = Node1("Specifier");}
@@ -80,6 +82,7 @@ Tag :
     ID {$$ = Node1("Tag");}
   ;
 
+//Declarators
 VarDec :
     ID                  {$$ = Node1("VarDec");}
   | VarDec LB INT RB    {$$ = Node4("VarDec");}
@@ -96,6 +99,7 @@ ParamDec :
     Specifier VarDec    {$$ = Node2("ParamDec");}
   ;
 
+//Statements
 CompSt :
     LC DefList StmtList RC  {$$ = Node4("CompSt");}
   ;
@@ -113,6 +117,7 @@ Stmt :
   | error SEMI                              {$$ = Node1("Stmt");}
   ;
 
+//Local Definitions
 DefList :
     Def DefList {$$ = Node2("DefList");}
   | %empty      {$$ = Node0("DefList");}
@@ -129,6 +134,7 @@ Dec :
   | VarDec ASSIGNOP Exp {$$ = Node3("Dec");}
   ;
 
+//Expressions
 Exp :
     Exp ASSIGNOP Exp    {$$ = Node3("Exp");}
   | Exp AND Exp         {$$ = Node3("Exp");}
