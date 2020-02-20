@@ -1,0 +1,6 @@
+int main()
+{
+    float a[10][2];
+    int i;
+    a[5,3] = a[5, 3]
+}
