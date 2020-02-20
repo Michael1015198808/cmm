@@ -1,0 +1,47 @@
+Program (1)
+  ExtDefList (1)
+    ExtDef (1)
+      Specifier (1)
+        TYPE: int
+      FunDec (1)
+        ID: __init__
+        LP
+        RP
+      CompSt (1)
+        LC
+        StmtList (2)
+          Stmt (2)
+            Exp (2)
+              FLOAT: 0.700000
+            SEMI
+          StmtList (3)
+            Stmt (3)
+              Exp (3)
+                FLOAT: 12.430000
+              SEMI
+            StmtList (4)
+              Stmt (4)
+                Exp (4)
+                  FLOAT: 9.000000
+                SEMI
+              StmtList (5)
+                Stmt (5)
+                  Exp (5)
+                    FLOAT: 1230000000000.000000
+                  SEMI
+                StmtList (6)
+                  Stmt (6)
+                    Exp (6)
+                      FLOAT: 0.004300
+                    SEMI
+                  StmtList (7)
+                    Stmt (7)
+                      Exp (7)
+                        FLOAT: 500.000000
+                      SEMI
+                    StmtList (8)
+                      Stmt (8)
+                        Exp (8)
+                          FLOAT: 500.000000
+                        SEMI
+        RC

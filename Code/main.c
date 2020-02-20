@@ -2,6 +2,7 @@
 
 void preorder(node*);
 int error_cnt = 0;
+int yydebug = 1;
 int main(int argc, char** argv) {
     if(argc > 1) {
         if(!(yyin = fopen(argv[1], "r"))) {

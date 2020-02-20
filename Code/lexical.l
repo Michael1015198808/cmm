@@ -16,7 +16,7 @@
 digit [0-9]
 oct [0-7]
 hex [0-9a-fA-F]
-letter [_a-zA-Z]
+letter_ [_a-zA-Z]
 %option yylineno
 demi_num 0|([1-9]{digit}*)
 oct_num 0{oct}+
@@ -49,14 +49,16 @@ hex_num 0x{hex}+
 "||"        {TOKEN(OR);}
 "."         {TOKEN(DOT);}
 "!"         {TOKEN(NOT);}
-int|float {
+"int" {
     yylval = Singleton("TYPE");
     yylval -> func = type_printer;
-    if(!strcmp("int", yytext)) {
-        yylval -> val_int = 1;
-    } else {
-        yylval -> val_int = 2;
-    }
+    yylval -> val_int = 1;
+    return TYPE;
+}
+"float" {
+    yylval = Singleton("TYPE");
+    yylval -> func = type_printer;
+    yylval -> val_int = 2;
     return TYPE;
 }
 "("         {TOKEN(LP);}
@@ -73,7 +75,7 @@ int|float {
 [ \t\r]
 "\n"        {yycolumn = 1;}
 
-{digit}*\.{digit}+(e[\+\-]?{digit}+)? {
+{digit}*\.{digit}*([Ee][\+\-]?{digit}+)? {
     yylval = Singleton("FLOAT");
     yylval -> val_float = atof(yytext);
     yylval -> func = float_printer;
@@ -87,7 +89,7 @@ int|float {
     return INT;
 }
 
-{letter}({letter}|{digit})* {
+{letter_}({letter_}|{digit})* {
     yylval = Singleton("ID");
     asprintf((char**)&yylval -> val_str, "%s", yytext);
     yylval -> func = id_printer;

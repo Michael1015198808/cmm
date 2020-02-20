@@ -115,7 +115,7 @@ Stmt :
   | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {$$ = Node5("Stmt");}
   | IF LP Exp RP Stmt ELSE Stmt             {$$ = Node7("Stmt");}
   | WHILE LP Exp RP Stmt                    {$$ = Node5("Stmt");}
-  | error SEMI                              {yyerrok;$$ = Node1("Stmt");}
+  | error SEMI                              {yyerrok;$$ = Node2("Stmt");}
   ;
 
 //Local Definitions

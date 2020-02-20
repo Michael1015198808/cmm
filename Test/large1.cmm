@@ -1,0 +1,70 @@
+int hand[34], cnt;
+int CardType[5];
+int card_to_id(int num,int type) {
+    return num - 1 + type * 9;
+}
+int id_to_num(int id) {
+    return id / 9 + 1;
+}
+int id_to_type(int id) {
+    return id / 9;
+}
+int judge(int id) {
+    if(cnt == 2) {
+        assert(0);
+    } else {
+        int num = id_to_num(id);
+        int type = id_to_type(id);
+        if(id >= 34) {
+            return false;
+        }
+        cnt = cnt - 3;
+        if(num <= (9-2) && type != 3) {
+            if(hand[id] && hand[id + 1] && hand[id + 2]) {
+                --hand[id];
+                --hand[id + 1];
+                --hand[id + 2];
+                if(judge(id)) {
+                    return true;
+                }
+                hand[id] = hand[id] + 1;
+                hand[id + 1] = hand[id + 1] + 1;
+                hand[id + 2] = hand[id + 2] + 1;
+            }
+        }
+        if(hand[id] >= 3) {
+            hand[id] = hand[id] - 3;
+            if(judge(id + 1)) {
+                return true;
+            }
+            hand[id] = hand[id] + 3;
+        }
+        cnt = cnt + 3;
+        return judge(id + 1);
+    }
+}
+int judge() {
+    return judge(0);
+}
+int main() {
+    while(1) {
+        memset(hand, 0, sizeof(hand));
+        cnt = 14;
+        while(i < 14) {
+            int card[3];
+            if(scanf(NULL, card) != 1)return 0;
+            while(i < 4) {
+                if(card[1] == CardType[i]) {
+                    hand[card_to_id(card[0] - 0x30, i)];
+                    break;
+                }
+            }
+        }
+        if(judge()) {
+            printf(str1);
+        } else {
+            printf(str2);
+        }
+    }
+    return 0;
+}
