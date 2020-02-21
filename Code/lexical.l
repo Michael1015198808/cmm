@@ -75,16 +75,14 @@ hex_num 0x{hex}+
 [ \t\r]
 "\n"        {yycolumn = 1;}
 
-\.+([Ee][\+\-]?{digit}+) {
-    error e;
-    e.type = 'A';
-    e.lineno = yylineno;
-    asprintf(&e.msg, "Bad FLOAT format: \"%s\"", yytext);
-    cmm_error(e);
+{digit}+\.{digit}*([Ee][\+\-]?{digit}+)? {
+    yylval = Singleton("FLOAT");
+    yylval -> val_float = atof(yytext);
+    yylval -> func = float_printer;
     return FLOAT;
 }
 
-{digit}*\.{digit}*([Ee][\+\-]?{digit}+)? {
+\.{digit}+([Ee][\+\-]?{digit}+)? {
     yylval = Singleton("FLOAT");
     yylval -> val_float = atof(yytext);
     yylval -> func = float_printer;
@@ -105,7 +103,7 @@ hex_num 0x{hex}+
     return ID;
 }
 
-[x0-9a-zA-Z]+ {
+(0x?)?[0-9a-zA-Z]+ {
     error e;
     e.type = 'A';
     e.lineno = yylineno;

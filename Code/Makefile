@@ -47,7 +47,7 @@ clean:
 gdb: parser
 	@gdb parser
 #一键测试../Test目录下所有.cmm文件的输出是否和.out一致
-test:
+test: parser
 	@for case in $(TEST_CASE); \
 	do \
 		./parser $$case.cmm > temp.out; \
