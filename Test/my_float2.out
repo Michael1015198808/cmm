@@ -1,1 +1,2 @@
-Error type B at Line 3: syntax error
+Error type A at Line 3: Bad FLOAT format: ".e-4"
+Error type A at Line 5: Bad FLOAT format: "1.05e"

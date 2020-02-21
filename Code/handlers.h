@@ -3,9 +3,9 @@
 
 #include"common.h"
 
-handler int_printer();
-handler float_printer();
-handler type_printer();
-handler id_printer();
+void int_printer(node*);
+void float_printer(node*);
+void type_printer(node*);
+void id_printer(node*);
 
 #endif

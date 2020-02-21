@@ -37,7 +37,16 @@ syntax-c: $(YFILE)
 -include $(patsubst %.o, %.d, $(OBJS))
 
 # 定义的一些伪目标
-.PHONY: clean test gdb gen
+.PHONY: clean test gdb gen runall 
+clean:
+	rm -f parser lex.yy.c syntax.tab.c syntax.tab.h syntax.output
+	rm -f $(OBJS) $(OBJS:.o=.d)
+	rm -f $(LFC) $(YFC) $(YFC:.c=.h)
+	rm -f *~
+#gdb运行parser
+gdb: parser
+	@gdb parser
+#一键测试../Test目录下所有.cmm文件的输出是否和.out一致
 test:
 	@for case in $(TEST_CASE); \
 	do \
@@ -45,16 +54,19 @@ test:
 		if diff temp.out $$case.out >/dev/null; \
 		then true; \
 		else echo Wrong on $$case;\
-		exit; \
 	fi; \
 	done;
-clean:
-	rm -f parser lex.yy.c syntax.tab.c syntax.tab.h syntax.output
-	rm -f $(OBJS) $(OBJS:.o=.d)
-	rm -f $(LFC) $(YFC) $(YFC:.c=.h)
-	rm -f *~
-gdb: parser
-	@gdb parser
+#生成../Test目录下所有.cmm文件对应的.out，以备日后make test
+gen: parser $(TEST_OUT)
+
 ../Test/%.out : ../Test/%.cmm parser
-	@./parser $< > $@
-gen: $(TEST_OUT)
+	./parser $< > $@
+#打印../Test目录下所有.cmm文件并生成对应.out
+runall: parser $(TEST_OUT)
+	@for case in $(TEST_CASE); \
+	do \
+	echo $$case.cmm; \
+	cat $$case.cmm; \
+	echo $$case.out; \
+	cat $$case.out; \
+	done;

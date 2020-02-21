@@ -60,6 +60,7 @@ ExtDef :
     Specifier ExtDecList SEMI   {$$ = Node3("ExtDef");}
   | Specifier SEMI              {$$ = Node2("ExtDef");}
   | Specifier FunDec CompSt     {$$ = Node3("ExtDef");}
+  | error SEMI                  {$$ = Node1("ExtDef");}
   ;
 ExtDecList :
     VarDec                  {$$ = Node1("ExtDecList");}
@@ -91,6 +92,7 @@ VarDec :
 FunDec :
     ID LP VarList RP    {$$ = Node4("FunDec");}
   | ID LP RP            {$$ = Node3("FunDec");}
+  | LP error RP         {$$ = Node2("FunDec");}
   ;
 VarList :
     ParamDec COMMA VarList  {$$ = Node3("VarList");}
@@ -103,6 +105,7 @@ ParamDec :
 //Statements
 CompSt :
     LC DefList StmtList RC  {$$ = Node4("CompSt");}
+  | LC DefList error RC     {$$ = Node3("CompSt");}
   ;
 StmtList :
     Stmt StmtList   {$$ = Node2("StmtList");}
@@ -115,7 +118,8 @@ Stmt :
   | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {$$ = Node5("Stmt");}
   | IF LP Exp RP Stmt ELSE Stmt             {$$ = Node7("Stmt");}
   | WHILE LP Exp RP Stmt                    {$$ = Node5("Stmt");}
-  | error SEMI                              {yyerrok;$$ = Node2("Stmt");}
+  | error SEMI                              {$$ = Node1("Stmt");}
+  | IF LP error RP Stmt                     {$$ = Node4("Stmt");}
   ;
 
 //Local Definitions
@@ -156,6 +160,7 @@ Exp :
   | ID                  {$$ = Node1("Exp");}
   | INT                 {$$ = Node1("Exp");}
   | FLOAT               {$$ = Node1("Exp");}
+  | LP error RP         {$$ = Node2("Exp");}
   ;
 Args :
     Exp COMMA Args  {$$ = Node3("Args");}
