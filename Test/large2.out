@@ -1,0 +1,23 @@
+Error type B at Line 2: syntax error
+Error type B at Line 3: syntax error
+Error type A at Line 3: Mysterious characters """
+Error type A at Line 3: Mysterious characters """
+Error type A at Line 8: Mysterious characters "%"
+Error type B at Line 8: syntax error
+Error type B at Line 13: syntax error
+Error type A at Line 15: Mysterious characters ":"
+Error type A at Line 17: Mysterious characters ":"
+Error type A at Line 19: Mysterious characters ":"
+Error type B at Line 29: syntax error
+Error type A at Line 64: Mysterious characters """
+Error type A at Line 64: Mysterious characters "%"
+Error type A at Line 64: Bad INT format: "2s"
+Error type A at Line 64: Mysterious characters """
+Error type A at Line 67: Mysterious characters "'"
+Error type A at Line 67: Mysterious characters "'"
+Error type A at Line 73: Mysterious characters """
+Error type A at Line 73: Mysterious characters "\"
+Error type A at Line 73: Mysterious characters """
+Error type A at Line 75: Mysterious characters """
+Error type A at Line 75: Mysterious characters "\"
+Error type A at Line 75: Mysterious characters """

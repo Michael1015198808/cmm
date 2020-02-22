@@ -52,9 +52,10 @@ test: parser
 	do \
 		./parser $$case.cmm > temp.out; \
 		if diff temp.out $$case.out >/dev/null; \
-		then true; \
-		else echo Wrong on $$case;\
-	fi; \
+			then true; \
+			else echo Wrong on $$case;\
+		fi; \
+		rm temp.out; \
 	done;
 #生成../Test目录下所有.cmm文件对应的.out，以备日后make test
 gen: parser $(TEST_OUT)

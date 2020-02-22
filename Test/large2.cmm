@@ -1,0 +1,79 @@
+int hand[34] , cnt;
+int nmsl = 1;
+int CardType[5] = "mpsz";
+int card_to_id(int num,int type) {
+    return num - 1 + type * 9;
+}
+int id_to_num(int id) {
+    return id % 9 + 1;
+}
+int id_to_type(int id) {
+    return id / 9;
+}
+bool judge(int id) {
+    if(cnt == 2) {
+        for(int x:hand) {
+            switch(x) {
+                case 2:
+                    return true;
+                case 1:
+                    return false;
+            }
+        }
+        assert(0);
+    } else {
+        if(id >= 34) {
+            return false;
+        }
+        int num = id_to_num(id);
+        int type = id_to_type(id);
+        cnt -= 3;
+        if(num <= (9-2) && type != 3) {
+            if(hand[id] && hand[id + 1] && hand[id + 2]) {
+                --hand[id];
+                --hand[id + 1];
+                --hand[id + 2];
+                if(judge(id)) {
+                    return true;
+                }
+                ++hand[id];
+                ++hand[id + 1];
+                ++hand[id + 2];
+            }
+        }
+        if(hand[id] >= 3) {
+            hand[id] -= 3;
+            if(judge(id + 1)) {
+                return true;
+            }
+            hand[id] += 3;
+        }
+        cnt += 3;
+        return judge(id + 1);
+    }
+}
+bool judge() {
+    return judge(0);
+}
+int main() {
+    while(1) {
+        memset(hand, 0, sizeof(hand));
+        cnt = 14;
+        for(int i = 0; i < 14; ++i) {
+            char card[3];
+            if(scanf("%2s", card) != 1)return 0;
+            for(int i = 0; i < 4; ++i) {
+                if(card[1] == CardType[i]) {
+                    ++hand[card_to_id(card[0] - '0', i)];
+                    break;
+                }
+            }
+        }
+        if(judge()) {
+            printf("tsumo!\n");
+        } else {
+            printf("not tsumo...\n");
+        }
+    }
+    return 0;
+}

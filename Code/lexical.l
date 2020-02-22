@@ -12,6 +12,9 @@
         yylloc.first_column = yycolumn; \
         yylloc.last_column = yycolumn + yyleng - 1; \
         yycolumn += yyleng;
+    void stop() {
+
+    }
 %}
 digit [0-9]
 oct [0-7]
@@ -21,22 +24,25 @@ letter_ [_a-zA-Z]
 demi_num 0|([1-9]{digit}*)
 oct_num 0{oct}+
 hex_num 0x{hex}+
+%x C_COMMENT
+
 %%
 
 \/\/.*
-"/*"        {
-    char c = input();
-    do {
-        if(c == '*') {
-            c = input();
-            if(c == '/') {
-                break;
-            }
-        } else {
-            c = input();
-        }
-    } while(1);
+
+"/*"                {BEGIN(C_COMMENT);}
+<C_COMMENT>"*/"     {BEGIN(INITIAL);}
+<C_COMMENT>\n   
+<C_COMMENT>.    
+<C_COMMENT><<EOF>>  {
+    error e;
+    e.type = 'A';
+    e.lineno = yylineno;
+    asprintf(&e.msg, "unterminated comment");
+    cmm_error(e);
+    BEGIN(INITIAL);
 }
+
 ";"         {TOKEN(SEMI);}
 ","         {TOKEN(COMMA);}
 "="         {TOKEN(ASSIGNOP);}
@@ -75,14 +81,14 @@ hex_num 0x{hex}+
 [ \t\r]
 "\n"        {yycolumn = 1;}
 
-{digit}+\.{digit}*([Ee][\+\-]?{digit}+)? {
+{digit}+\.{digit}+([Ee][\+\-]?{digit}+)? {
     yylval = Singleton("FLOAT");
     yylval -> val_float = atof(yytext);
     yylval -> func = float_printer;
     return FLOAT;
 }
 
-\.{digit}+([Ee][\+\-]?{digit}+)? {
+(({digit}+\.{digit}*)|(\.{digit}+))[Ee][\+\-]?{digit}+ {
     yylval = Singleton("FLOAT");
     yylval -> val_float = atof(yytext);
     yylval -> func = float_printer;
@@ -112,7 +118,15 @@ hex_num 0x{hex}+
     return INT;
 }
 
-{digit}*\.{digit}*([Ee][\+\-]?{digit}*)? {
+{digit}*\.{digit}* {
+    error e;
+    e.type = 'A';
+    e.lineno = yylineno;
+    asprintf(&e.msg, "Bad FLOAT format: \"%s\"", yytext);
+    cmm_error(e);
+    return FLOAT;
+}
+{digit}*\.{digit}+[Ee]?[+-]?{digit}* {
     error e;
     e.type = 'A';
     e.lineno = yylineno;

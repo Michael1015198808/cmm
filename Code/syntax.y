@@ -13,6 +13,8 @@
     #define Node7(name) Node(name, yylsp[-6].first_line, 7, yyvsp[-6], yyvsp[-5], yyvsp[-4], yyvsp[-3], yyvsp[-2], yyvsp[-1], yyvsp[0])
 %}
 
+%token COMMENT
+
 %token INT
 %token FLOAT
 %token ID
