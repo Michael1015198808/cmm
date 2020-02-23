@@ -11,9 +11,8 @@
     #define Node5(name) Node(name, yylsp[-4].first_line, 5, yyvsp[-4], yyvsp[-3], yyvsp[-2], yyvsp[-1], yyvsp[0])
     #define Node6(name) Node(name, yylsp[-5].first_line, 6, yyvsp[-5], yyvsp[-4], yyvsp[-3], yyvsp[-2], yyvsp[-1], yyvsp[0])
     #define Node7(name) Node(name, yylsp[-6].first_line, 7, yyvsp[-6], yyvsp[-5], yyvsp[-4], yyvsp[-3], yyvsp[-2], yyvsp[-1], yyvsp[0])
+    int yyerror(char* msg) {}
 %}
-
-%token COMMENT
 
 %token INT
 %token FLOAT
@@ -62,7 +61,7 @@ ExtDef :
     Specifier ExtDecList SEMI   {$$ = Node3("ExtDef");}
   | Specifier SEMI              {$$ = Node2("ExtDef");}
   | Specifier FunDec CompSt     {$$ = Node3("ExtDef");}
-  | error SEMI                  {$$ = Node1("ExtDef");}
+  | error SEMI                  {syntax_error(@1.first_line, "1");$$ = Node1("ExtDef");}
   ;
 ExtDecList :
     VarDec                  {$$ = Node1("ExtDecList");}
@@ -94,7 +93,7 @@ VarDec :
 FunDec :
     ID LP VarList RP    {$$ = Node4("FunDec");}
   | ID LP RP            {$$ = Node3("FunDec");}
-  | LP error RP         {$$ = Node2("FunDec");}
+  | LP error RP         {syntax_error(@1.first_line, "2");$$ = Node2("FunDec");}
   ;
 VarList :
     ParamDec COMMA VarList  {$$ = Node3("VarList");}
@@ -107,7 +106,7 @@ ParamDec :
 //Statements
 CompSt :
     LC DefList StmtList RC  {$$ = Node4("CompSt");}
-  | LC DefList error RC     {$$ = Node3("CompSt");}
+  | LC DefList error RC     {syntax_error(@1.first_line, "3");$$ = Node3("CompSt");}
   ;
 StmtList :
     Stmt StmtList   {$$ = Node2("StmtList");}
@@ -120,8 +119,8 @@ Stmt :
   | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {$$ = Node5("Stmt");}
   | IF LP Exp RP Stmt ELSE Stmt             {$$ = Node7("Stmt");}
   | WHILE LP Exp RP Stmt                    {$$ = Node5("Stmt");}
-  | error SEMI                              {$$ = Node1("Stmt");}
-  | IF LP error RP Stmt                     {$$ = Node4("Stmt");}
+  | error SEMI                              {syntax_error(@1.first_line, "4");$$ = Node1("Stmt");}
+  | IF LP error RP Stmt                     {syntax_error(@1.first_line, "5");$$ = Node4("Stmt");}
   ;
 
 //Local Definitions
@@ -162,7 +161,7 @@ Exp :
   | ID                  {$$ = Node1("Exp");}
   | INT                 {$$ = Node1("Exp");}
   | FLOAT               {$$ = Node1("Exp");}
-  | LP error RP         {$$ = Node2("Exp");}
+  | LP error RP         {syntax_error(@1.first_line, "6");$$ = Node2("Exp");}
   ;
 Args :
     Exp COMMA Args  {$$ = Node3("Args");}

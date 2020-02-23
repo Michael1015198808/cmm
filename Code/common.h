@@ -57,12 +57,8 @@ static inline node* Singleton(const char* fmt, ...) {
     return Node(buf, yylineno, 0);
 }
 
-typedef struct error {
-    char* msg;
-    int lineno;
-    char type;
-} error;
-int cmm_error(error);
+int lexical_error(int lineno, const char* fmt, ...);
+int syntax_error(int lineno, const char* fmt, ...);
 
 #define TODO() \
     do { \
@@ -71,7 +67,7 @@ int cmm_error(error);
 
 #define Assert() \
     do { \
-        printf("%s: %d Should not reach here\n", __FILE__, __LINE__); \
+        printf("%s: %d not implemented\n", __FILE__, __LINE__); \
     } while(0)
 
 #endif

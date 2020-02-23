@@ -17,23 +17,27 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-int cmm_error(error e) {
+int lexical_error(int lineno, const char* fmt, ...) {
     ++error_cnt;
-    printf("Error type %c at Line %d: %s\n", e.type, e.lineno, e.msg);
+    va_list ap;
+    va_start(ap, fmt);
+    printf("Error type A at Line %d: ", lineno);
+    vprintf(fmt, ap);
+    putchar('\n');
 }
 
-int yyerror(char* msg) {
-    error e;
-    e.type = 'B';
-    e.lineno = yylineno;
-    e.msg = msg;
-    cmm_error(e);
+int syntax_error(int lineno, const char* fmt, ...) {
+    ++error_cnt;
+    va_list ap;
+    va_start(ap, fmt);
+    printf("Error type B at Line %d: ", lineno);
+    vprintf(fmt, ap);
+    putchar('\n');
 }
 
 void preorder(node* cur) {
     static int indent = 0;
-    if(indent)
-        printf("%*c", indent, ' ');
+    printf("%*s", indent, "");
     if(cur->cnt) {
         printf("%s (%d)\n", cur->name, cur->lineno);
         indent+=2;

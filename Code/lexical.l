@@ -24,29 +24,26 @@ letter_ [_a-zA-Z]
 demi_num 0|([1-9]{digit}*)
 oct_num 0{oct}+
 hex_num 0x{hex}+
+float_exp [Ee][\+\-]?{digit}+
 %x C_COMMENT
 
 %%
 
-\/\/.*
+"//".*
 
 "/*"                {BEGIN(C_COMMENT);}
 <C_COMMENT>"*/"     {BEGIN(INITIAL);}
 <C_COMMENT>\n   
 <C_COMMENT>.    
 <C_COMMENT><<EOF>>  {
-    error e;
-    e.type = 'A';
-    e.lineno = yylineno;
-    asprintf(&e.msg, "unterminated comment");
-    cmm_error(e);
+    lexical_error(yylineno, "unterminated comment");
     BEGIN(INITIAL);
 }
 
 ";"         {TOKEN(SEMI);}
 ","         {TOKEN(COMMA);}
 "="         {TOKEN(ASSIGNOP);}
-">"|"<"|">="|"<="|"=="|"!=" {return RELOP;}
+">"|"<"|">="|"<="|"=="|"!=" {TOKEN(RELOP);}
 "+"         {TOKEN(PLUS);}
 "-"         {TOKEN(MINUS);}
 "*"         {TOKEN(STAR);}
@@ -81,14 +78,14 @@ hex_num 0x{hex}+
 [ \t\r]
 "\n"        {yycolumn = 1;}
 
-{digit}+\.{digit}+([Ee][\+\-]?{digit}+)? {
+{digit}+\.{digit}+{float_exp}? {
     yylval = Singleton("FLOAT");
     yylval -> val_float = atof(yytext);
     yylval -> func = float_printer;
     return FLOAT;
 }
 
-(({digit}+\.{digit}*)|(\.{digit}+))[Ee][\+\-]?{digit}+ {
+(({digit}+\.{digit}*)|(\.{digit}+)){float_exp} {
     yylval = Singleton("FLOAT");
     yylval -> val_float = atof(yytext);
     yylval -> func = float_printer;
@@ -109,38 +106,34 @@ hex_num 0x{hex}+
     return ID;
 }
 
-(0x?)?[0-9a-zA-Z]+ {
-    error e;
-    e.type = 'A';
-    e.lineno = yylineno;
-    asprintf(&e.msg, "Bad INT format: \"%s\"", yytext);
-    cmm_error(e);
+
+0[Xx][0-9a-zA-Z]+ {
+    lexical_error(yylineno, "Bad hexademical INT format: \"%s\"", yytext);
     return INT;
 }
 
-{digit}*\.{digit}* {
-    error e;
-    e.type = 'A';
-    e.lineno = yylineno;
-    asprintf(&e.msg, "Bad FLOAT format: \"%s\"", yytext);
-    cmm_error(e);
+0{digit}+ {
+    lexical_error(yylineno, "Bad octal INT format: \"%s\"", yytext);
+    return INT;
+}
+
+{digit}*\.{digit}+[Ee] {
+    lexical_error(yylineno, "Bad FLOAT format: \"%s\"", yytext);
     return FLOAT;
 }
-{digit}*\.{digit}+[Ee]?[+-]?{digit}* {
-    error e;
-    e.type = 'A';
-    e.lineno = yylineno;
-    asprintf(&e.msg, "Bad FLOAT format: \"%s\"", yytext);
-    cmm_error(e);
+
+({letter_}|{digit})+ {
+    lexical_error(yylineno, "Bad ID format: \"%s\"", yytext);
+    return ID;
+}
+
+{digit}*\.{digit}* {
+    lexical_error(yylineno, "Bad FLOAT format: \"%s\"", yytext);
     return FLOAT;
 }
 
 . {
-    error e;
-    e.type = 'A';
-    e.lineno = yylineno;
-    asprintf(&e.msg, "Mysterious characters \"%s\"", yytext);
-    cmm_error(e);
+    lexical_error(yylineno, "Mysterious characters \"%s\"", yytext);
 }
 
 %%
