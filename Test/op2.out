@@ -1,2 +1,2 @@
-Error type A at Line 3: Bad INT format: "09"
-Error type A at Line 4: Bad INT format: "0x3G"
+Error type A at Line 3: Illegal octal INT number: "09"
+Error type A at Line 4: Illegal hexademical INT number: "0x3G"

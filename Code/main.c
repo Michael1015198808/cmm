@@ -27,6 +27,11 @@ int lexical_error(int lineno, const char* fmt, ...) {
 }
 
 int syntax_error(int lineno, const char* fmt, ...) {
+    static int last_line = 0;
+    if(lineno == last_line) {
+        return -1;//Prevent reporting too much errors
+    }
+    last_line = lineno;
     ++error_cnt;
     va_list ap;
     va_start(ap, fmt);

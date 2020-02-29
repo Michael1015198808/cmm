@@ -1,23 +1,50 @@
-Error type B at Line 2: syntax error
-Error type B at Line 3: syntax error
+Error type B at Line 2: missing ";"
+Error type B at Line 3: missing ";"
 Error type A at Line 3: Mysterious characters """
 Error type A at Line 3: Mysterious characters """
 Error type A at Line 8: Mysterious characters "%"
-Error type B at Line 8: syntax error
-Error type B at Line 13: syntax error
+Error type B at Line 8: missing ";"
 Error type A at Line 15: Mysterious characters ":"
 Error type A at Line 17: Mysterious characters ":"
+Error type B at Line 13: 1
 Error type A at Line 19: Mysterious characters ":"
-Error type B at Line 29: syntax error
+Error type B at Line 19: 1
+Error type B at Line 21: 1
+Error type B at Line 24: 1
+Error type B at Line 27: 1
+Error type B at Line 29: missing ";"
+Error type B at Line 30: 1
+Error type B at Line 31: 1
+Error type B at Line 34: 1
+Error type B at Line 35: 1
+Error type B at Line 36: 1
+Error type B at Line 38: 1
+Error type B at Line 40: 1
+Error type B at Line 41: 1
+Error type B at Line 42: 1
+Error type B at Line 46: 1
+Error type B at Line 48: 1
+Error type B at Line 50: 1
+Error type B at Line 52: 1
+Error type B at Line 53: 1
+Error type B at Line 57: 1
+Error type B at Line 61: 1
+Error type B at Line 62: 1
 Error type A at Line 64: Mysterious characters """
 Error type A at Line 64: Mysterious characters "%"
-Error type A at Line 64: Bad INT format: "2s"
+Error type A at Line 64: Illegal ID format: "2s"
 Error type A at Line 64: Mysterious characters """
+Error type B at Line 64: 1
+Error type B at Line 65: 1
 Error type A at Line 67: Mysterious characters "'"
 Error type A at Line 67: Mysterious characters "'"
+Error type B at Line 68: 1
 Error type A at Line 73: Mysterious characters """
 Error type A at Line 73: Mysterious characters "\"
 Error type A at Line 73: Mysterious characters """
+Error type B at Line 69: 1
 Error type A at Line 75: Mysterious characters """
 Error type A at Line 75: Mysterious characters "\"
 Error type A at Line 75: Mysterious characters """
+Error type B at Line 74: 1
+Error type B at Line 76: 1

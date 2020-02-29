@@ -150,7 +150,7 @@ Program (1)
                       Exp (13)
                         Exp (13)
                           ID: cnt
-                        ID: cnt
+                        RELOP
                         Exp (13)
                           INT: 2
                       RP
@@ -213,7 +213,7 @@ Program (1)
                               Exp (18)
                                 Exp (18)
                                   ID: id
-                                ID: id
+                                RELOP
                                 Exp (18)
                                   INT: 34
                               RP
@@ -248,7 +248,7 @@ Program (1)
                                     Exp (22)
                                       Exp (22)
                                         ID: num
-                                      ID: num
+                                      RELOP
                                       Exp (22)
                                         LP
                                         Exp (22)
@@ -262,7 +262,7 @@ Program (1)
                                     Exp (22)
                                       Exp (22)
                                         ID: type
-                                      ID: type
+                                      RELOP
                                       Exp (22)
                                         INT: 3
                                   RP
@@ -481,7 +481,7 @@ Program (1)
                                         Exp (35)
                                           ID: id
                                         RB
-                                      RB
+                                      RELOP
                                       Exp (35)
                                         INT: 3
                                     RP
@@ -672,7 +672,7 @@ Program (1)
                                       Exp (53)
                                         Exp (53)
                                           ID: i
-                                        ID: i
+                                        RELOP
                                         Exp (53)
                                           INT: 14
                                       RP
@@ -708,7 +708,7 @@ Program (1)
                                                       Exp (55)
                                                         ID: card
                                                   RP
-                                                RP
+                                                RELOP
                                                 Exp (55)
                                                   INT: 1
                                               RP
@@ -724,7 +724,7 @@ Program (1)
                                                 Exp (56)
                                                   Exp (56)
                                                     ID: i
-                                                  ID: i
+                                                  RELOP
                                                   Exp (56)
                                                     INT: 4
                                                 RP
@@ -743,7 +743,7 @@ Program (1)
                                                             Exp (57)
                                                               INT: 1
                                                             RB
-                                                          RB
+                                                          RELOP
                                                           Exp (57)
                                                             Exp (57)
                                                               ID: CardType

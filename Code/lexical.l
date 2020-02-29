@@ -23,7 +23,7 @@ letter_ [_a-zA-Z]
 %option yylineno
 demi_num 0|([1-9]{digit}*)
 oct_num 0{oct}+
-hex_num 0x{hex}+
+hex_num 0[Xx]{hex}+
 float_exp [Ee][\+\-]?{digit}+
 %x C_COMMENT
 
@@ -108,27 +108,32 @@ float_exp [Ee][\+\-]?{digit}+
 
 
 0[Xx][0-9a-zA-Z]+ {
-    lexical_error(yylineno, "Bad hexademical INT format: \"%s\"", yytext);
+    lexical_error(yylineno, "Illegal hexademical INT number: \"%s\"", yytext);
     return INT;
 }
 
 0{digit}+ {
-    lexical_error(yylineno, "Bad octal INT format: \"%s\"", yytext);
+    lexical_error(yylineno, "Illegal octal INT number: \"%s\"", yytext);
     return INT;
 }
 
 {digit}*\.{digit}+[Ee] {
-    lexical_error(yylineno, "Bad FLOAT format: \"%s\"", yytext);
+    lexical_error(yylineno, "Illegal FLOAT number: \"%s\"", yytext);
     return FLOAT;
 }
 
 ({letter_}|{digit})+ {
-    lexical_error(yylineno, "Bad ID format: \"%s\"", yytext);
+    lexical_error(yylineno, "Illegal ID format: \"%s\"", yytext);
     return ID;
 }
 
 {digit}*\.{digit}* {
-    lexical_error(yylineno, "Bad FLOAT format: \"%s\"", yytext);
+    lexical_error(yylineno, "Illegal FLOAT number: \"%s\"", yytext);
+    return FLOAT;
+}
+
+{digit}+\.({digit}|{letter_})* {
+    lexical_error(yylineno, "Illegal FLOAT number: \"%s\"", yytext);
     return FLOAT;
 }
 

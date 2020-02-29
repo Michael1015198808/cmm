@@ -1,1 +1,2 @@
-Error type B at Line 10: syntax error
+Error type B at Line 10: missing ";"
+Error type B at Line 11: Something wrong with the statement
