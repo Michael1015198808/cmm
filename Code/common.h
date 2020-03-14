@@ -28,7 +28,7 @@ struct node {
         struct node** siblings;
         const char* val_str;
         unsigned int val_int;
-        double val_float;
+        float val_float;
     };
 };
 
@@ -36,9 +36,10 @@ node* root;
 
 static inline node* Node(const char* name,int lineno, int cnt, ...) {
     node* ret = (node*)malloc(sizeof(node));
+    ret->func = NULL;
     ret->name = name;
-    ret->lineno = lineno;
     ret->cnt = cnt;
+    ret->lineno = lineno;
     ret->siblings = (node**)malloc(sizeof(void*) * cnt);
     va_list ap;
     va_start(ap, cnt);

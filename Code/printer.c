@@ -5,7 +5,7 @@ void int_printer(node* node) {
 }
 
 void float_printer(node* node) {
-    printf("FLOAT: %lf\n", node -> val_float);
+    printf("FLOAT: %f\n", node -> val_float);
 }
 
 void type_printer(node* node) {

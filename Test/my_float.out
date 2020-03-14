@@ -27,7 +27,7 @@ Program (1)
               StmtList (5)
                 Stmt (5)
                   Exp (5)
-                    FLOAT: 1230000000000.000000
+                    FLOAT: 1229999964160.000000
                   SEMI
                 StmtList (6)
                   Stmt (6)

@@ -1,30 +1,30 @@
-Error type B at Line 2: Missing ";"
-Error type B at Line 3: Missing ";"
+Error type B at Line 2: Missing ";".
+Error type B at Line 3: Missing ";".
 Error type A at Line 3: Mysterious characters """
 Error type A at Line 3: Mysterious characters """
 Error type A at Line 8: Mysterious characters "%"
-Error type B at Line 8: Missing ";"
-Error type B at Line 22: Something wrong with the expression
-Error type B at Line 31: Something wrong with the statement
-Error type B at Line 32: Something wrong with the statement
-Error type B at Line 33: Something wrong with the statement
-Error type B at Line 37: Something wrong with the expression
-Error type B at Line 41: Something wrong with the expression
-Error type B at Line 43: Something wrong with the expression
-Error type B at Line 55: Missing ";"
+Error type B at Line 8: Missing ";".
+Error type B at Line 22: Something wrong with the expression.
+Error type B at Line 31: Something wrong with the statement.
+Error type B at Line 32: Something wrong with the statement.
+Error type B at Line 33: Something wrong with the statement.
+Error type B at Line 37: Something wrong with the expression.
+Error type B at Line 41: Something wrong with the expression.
+Error type B at Line 43: Something wrong with the expression.
+Error type B at Line 55: Missing ";".
 Error type A at Line 56: Mysterious characters """
 Error type A at Line 56: Mysterious characters "%"
 Error type A at Line 56: Illegal ID format: "2s"
 Error type A at Line 56: Mysterious characters """
-Error type B at Line 57: Expect expression before ')'
+Error type B at Line 57: Expect expression before ')'.
 Error type A at Line 59: Mysterious characters "'"
 Error type A at Line 59: Mysterious characters "'"
-Error type B at Line 59: Something wrong with the statement
+Error type B at Line 59: Something wrong with the statement.
 Error type A at Line 65: Mysterious characters """
 Error type A at Line 65: Mysterious characters "\"
 Error type A at Line 65: Mysterious characters """
-Error type B at Line 65: Expect expression before ')'
+Error type B at Line 65: Expect expression before ')'.
 Error type A at Line 67: Mysterious characters """
 Error type A at Line 67: Mysterious characters "\"
 Error type A at Line 67: Mysterious characters """
-Error type B at Line 67: Expect expression before ')'
+Error type B at Line 67: Expect expression before ')'.
