@@ -43,6 +43,9 @@
 
 %left DOT
 %left LP RP LB RB LC RC
+
+%nonassoc LOWER
+%nonassoc HIGHER
 %locations
 
 
@@ -56,13 +59,13 @@ Program :
   ;
 ExtDefList :
     ExtDef ExtDefList   {$$ = Node2("ExtDefList");}
-  | %empty              {$$ = Node0("ExtDefList");}
+  | %empty              {$$ = Node0("ExtDefList"); @$.first_line = yylineno;}
   ;
 ExtDef :
     Specifier ExtDecList x_SEMI   {$$ = Node3("ExtDef");}
   | Specifier x_SEMI              {$$ = Node2("ExtDef");}
   | Specifier FunDec CompSt       {$$ = Node3("ExtDef");}
-  | error SEMI                    {syntax_error(@1.first_line, "1");}
+  | error SEMI                    {syntax_error(@1.first_line, "Something wrong with declaration");}
   ;
 ExtDecList :
     VarDec                  {$$ = Node1("ExtDecList");}
@@ -76,6 +79,7 @@ Specifier :
   ;
 StructSpecifier :
     STRUCT OptTag LC DefList RC {$$ = Node5("StructSpecifier");}
+  | STRUCT OptTag LC error RC   {syntax_error(@4.last_line, "Some thing wrong inside the structure");}
   | STRUCT Tag                  {$$ = Node2("StructSpecifier");}
   ;
 OptTag :
@@ -90,11 +94,12 @@ Tag :
 VarDec :
     ID                    {$$ = Node1("VarDec");}
   | VarDec LB INT x_RB    {$$ = Node4("VarDec");}
-  | VarDec LB error RB    {syntax_error(@1.first_line, "Size of array %s should be an integer", get_vardec_name($1));$$ = Node0("VarDec");}
+  | VarDec LB error RB    {syntax_error(@3.last_line, "Size of array %s should be an integer", get_vardec_name($1));$$ = Node0("VarDec");}
   ;
 FunDec :
-    ID LP VarList RP    {$$ = Node4("FunDec");}
-  | ID LP RP            {$$ = Node3("FunDec");}
+    ID LP VarList x_RP  {$$ = Node4("FunDec");}
+  | ID LP error RP      {syntax_error(@3.last_line, "Something wrong inside parameter definitions", get_vardec_name($1));$$ = Node0("FunDec");}
+  | ID LP x_RP          {$$ = Node3("FunDec");}
   ;
 VarList :
     ParamDec COMMA VarList  {$$ = Node3("VarList");}
@@ -122,8 +127,8 @@ Stmt :
   | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {$$ = Node5("Stmt");}
   | IF LP Exp RP Stmt ELSE Stmt             {$$ = Node7("Stmt");}
   | WHILE LP Exp RP Stmt                    {$$ = Node5("Stmt");}
-  | error SEMI                              {syntax_error(@1.first_line, "Something wrong with the statement");$$ = Node1("Stmt");}
-  | IF LP error RP Stmt                     {syntax_error(@1.first_line, "5");$$ = Node4("Stmt");}
+  | IF LP error RP Stmt                     {syntax_error(@1.first_line, "Expected expression before ')'");$$ = Node4("Stmt");}
+  | error SEMI                              {syntax_error(@1.first_line, "Something wrong with the statement");}
   ;
 
 //Local Definitions
@@ -185,11 +190,15 @@ Args :
 
 x_SEMI:
       SEMI
-  | error {syntax_error(@1.first_line, "missing \";\"");}
+  | error {syntax_error(@1.first_line, "Missing \";\"");}
   ;
 x_RB:
     RB
-  | error {syntax_error(@1.first_line, "missing \"]\"");}
+  | error {syntax_error(@1.first_line, "Missing \"]\"");}
+  ;
+x_RP:
+    RP
+  | error {syntax_error(@1.first_line, "Missing \")\"");}
   ;
 %%
 

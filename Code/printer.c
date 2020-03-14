@@ -1,7 +1,7 @@
 #include "common.h"
 
 void int_printer(node* node) {
-    printf("INT: %d\n", node -> val_int);
+    printf("INT: %u\n", node -> val_int);
 }
 
 void float_printer(node* node) {

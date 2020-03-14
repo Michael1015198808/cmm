@@ -27,7 +27,7 @@ struct node {
     union {
         struct node** siblings;
         const char* val_str;
-        int val_int;
+        unsigned int val_int;
         double val_float;
     };
 };

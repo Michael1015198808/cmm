@@ -1,1 +1,3 @@
-Error type B at Line 3: Something wrong with the expression
+Error type B at Line 3: Missing "]"
+Error type B at Line 5: Missing ";"
+Error type B at Line 6: Something wrong with the statement

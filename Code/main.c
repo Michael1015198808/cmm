@@ -10,9 +10,12 @@ int main(int argc, char** argv) {
             return 1;
         }
     }
-    yyparse();
-    if(!error_cnt) {
-        preorder(root);
+    if(yyparse()) {
+        syntax_error(yylineno, "End Of File unsupposed!");
+    } else {
+        if(!error_cnt) {
+            preorder(root);
+        }
     }
     return 0;
 }
