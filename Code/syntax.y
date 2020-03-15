@@ -114,7 +114,7 @@ ParamDec :
 //Statements
 CompSt :
     LC DefList StmtList RC  {$$ = Node4("CompSt");}
-  | LC DefList error RC     {syntax_error(@3.first_line, "Error in the sentence.");$$ = Node3("CompSt");}
+  | LC DefList error RC     {syntax_error(@3.first_line, "Error in the sentence(missing ;?).");$$ = Node3("CompSt");}
   ;
 StmtList :
     Stmt StmtList   {$$ = Node2("StmtList");}
