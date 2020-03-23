@@ -8,4 +8,6 @@ void float_printer(node*);
 void type_printer(node*);
 void id_printer(node*);
 
+const char* get_vardec_name(node*);
+void def_handler(node*);
 #endif

@@ -1,3 +1,17 @@
-Error type B at Line 3: Missing "]".
-Error type B at Line 5: Missing ";".
-Error type B at Line 6: Something wrong with the statement.
+Program (1)
+  ExtDefList (1)
+    ExtDef (1)
+      Specifier (1)
+        TYPE: int
+      ExtDecList (1)
+        VarDec (1)
+          ID: a
+        COMMA
+        ExtDecList (1)
+          VarDec (1)
+            ID: b
+          COMMA
+          ExtDecList (1)
+            VarDec (1)
+              ID: c
+      SEMI

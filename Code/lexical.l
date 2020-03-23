@@ -36,7 +36,7 @@ float_exp [Ee][\+\-]?{digit}+
 <C_COMMENT>\n   
 <C_COMMENT>.    
 <C_COMMENT><<EOF>>  {
-    lexical_error(yylineno, "unterminated comment");
+    lexical_error(yylineno, "unterminated comment.");
     BEGIN(INITIAL);
 }
 
@@ -80,14 +80,14 @@ float_exp [Ee][\+\-]?{digit}+
 
 {digit}+\.{digit}+{float_exp}? {
     yylval = Singleton("FLOAT");
-    yylval -> val_float = atof(yytext);
+    yylval -> val_float = strtof(yytext, NULL);
     yylval -> func = float_printer;
     return FLOAT;
 }
 
 (({digit}+\.{digit}*)|(\.{digit}+)){float_exp} {
     yylval = Singleton("FLOAT");
-    yylval -> val_float = atof(yytext);
+    yylval -> val_float = strtof(yytext, NULL);
     yylval -> func = float_printer;
     return FLOAT;
 }
@@ -108,37 +108,37 @@ float_exp [Ee][\+\-]?{digit}+
 
 
 0[Xx][0-9a-zA-Z]+ {
-    lexical_error(yylineno, "Illegal hexademical INT number: \"%s\"", yytext);
+    lexical_error(yylineno, "Illegal hexademical INT number: \"%s\".", yytext);
     return INT;
 }
 
 0{digit}+ {
-    lexical_error(yylineno, "Illegal octal INT number: \"%s\"", yytext);
+    lexical_error(yylineno, "Illegal octal INT number: \"%s\".", yytext);
     return INT;
 }
 
 {digit}*\.{digit}+[Ee] {
-    lexical_error(yylineno, "Illegal FLOAT number: \"%s\"", yytext);
+    lexical_error(yylineno, "Illegal FLOAT number: \"%s\".", yytext);
     return FLOAT;
 }
 
 ({letter_}|{digit})+ {
-    lexical_error(yylineno, "Illegal ID format: \"%s\"", yytext);
+    lexical_error(yylineno, "Illegal ID format: \"%s\".", yytext);
     return ID;
 }
 
 {digit}*\.{digit}* {
-    lexical_error(yylineno, "Illegal FLOAT number: \"%s\"", yytext);
+    lexical_error(yylineno, "Illegal FLOAT number: \"%s\".", yytext);
     return FLOAT;
 }
 
-{digit}+\.({digit}|{letter_})* {
-    lexical_error(yylineno, "Illegal FLOAT number: \"%s\"", yytext);
+{digit}+\.{digit}*e(-+)? {
+    lexical_error(yylineno, "Illegal FLOAT number: \"%s\".", yytext);
     return FLOAT;
 }
 
 . {
-    lexical_error(yylineno, "Mysterious characters \"%s\"", yytext);
+    lexical_error(yylineno, "Mysterious characters \"%s\".", yytext);
 }
 
 %%

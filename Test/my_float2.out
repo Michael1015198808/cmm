@@ -1,4 +1,4 @@
 Error type B at Line 3: Something wrong with the statement.
-Error type A at Line 5: Illegal FLOAT number: "1.05e"
-Error type A at Line 7: Illegal FLOAT number: "5."
-Error type A at Line 9: Illegal FLOAT number: ".5"
+Error type A at Line 5: Illegal FLOAT number: "1.05e".
+Error type A at Line 7: Illegal FLOAT number: "5.".
+Error type A at Line 9: Illegal FLOAT number: ".5".

@@ -8,6 +8,8 @@
 
 #define YYSTYPE node*
 
+#define new(type) (type*)malloc(sizeof(type));
+
 extern FILE* yyin;
 int yylineno;
 int yylex();

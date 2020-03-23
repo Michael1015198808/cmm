@@ -37,9 +37,10 @@ syntax-c: $(YFILE)
 -include $(patsubst %.o, %.d, $(OBJS))
 
 # 定义的一些伪目标
-.PHONY: clean test gdb gen runall 
+.PHONY: clean test gdb gen runall run
 clean:
 	rm -f parser lex.yy.c syntax.tab.c syntax.tab.h syntax.output
+	rm -f tags
 	rm -f $(OBJS) $(OBJS:.o=.d)
 	rm -f $(LFC) $(YFC) $(YFC:.c=.h)
 	rm -f *~
@@ -71,3 +72,5 @@ runall: parser $(TEST_OUT)
 	echo $$case.out; \
 	cat $$case.out; \
 	done;
+run: parser
+	@./parser
