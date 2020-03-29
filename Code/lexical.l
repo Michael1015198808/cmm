@@ -55,13 +55,13 @@ float_exp [Ee][\+\-]?{digit}+
 "int" {
     yylval = Singleton("TYPE");
     yylval -> func = type_printer;
-    yylval -> val_int = 1;
+    yylval -> val_int = T_INT;
     return TYPE;
 }
 "float" {
     yylval = Singleton("TYPE");
     yylval -> func = type_printer;
-    yylval -> val_int = 2;
+    yylval -> val_int = T_FLOAT;
     return TYPE;
 }
 "("         {TOKEN(LP);}

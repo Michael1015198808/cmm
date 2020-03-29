@@ -1,1 +1,4 @@
-int a, b, c;
+struct test {
+    int a, b;
+};
+struct test q;

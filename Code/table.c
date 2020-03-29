@@ -9,7 +9,7 @@ typedef struct tab tab;
 struct tab{
     enum {TYPE, VARI} kind;
     Type type;
-    const char* name;
+    char* name;
     tab* next;
 };
 static tab* table[SIZE] = {};
@@ -26,10 +26,11 @@ int hash(const char* name) {
 }
 
 int table_insert(const char* name, Type type) {
+    my_log("Inserting %s\n", name);
     int x = hash(name);
     tab* p = malloc(sizeof(tab));
     p -> type = type;
-    p -> name = name;
+    asprintf(&p -> name, "%s", name);
     p -> next = table[x];
     table[x] = p;
     return 0;

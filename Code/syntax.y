@@ -1,6 +1,7 @@
 %{
     #include "common.h"
     #include "handlers.h"
+    #include "type.h"
     #include "lex.yy.c"
 
     //#define Node0(name) Node(name, yylsp[0].first_line, 0)
@@ -64,7 +65,7 @@ ExtDefList :
   ;
 ExtDef :
     Specifier ExtDecList x_SEMI   {$$ = Node3("ExtDef");$$ -> func = def_handler;}
-  | Specifier x_SEMI              {$$ = Node2("ExtDef");}
+  | Specifier x_SEMI              {$$ = Node2("ExtDef");$$ -> func = def_handler;}
   | Specifier FunDec CompSt       {$$ = Node3("ExtDef");}
   | error SEMI                    {syntax_error(@1.first_line, "Something wrong with declaration.");}
   ;
@@ -75,8 +76,8 @@ ExtDecList :
 
 //Specifiers
 Specifier :
-    TYPE                {$$ = Node1("Specifier");}
-  | StructSpecifier     {$$ = Node1("Specifier");}
+    TYPE                {$$ = Node1("Specifier");$$->func = type_handler;}
+  | StructSpecifier     {$$ = Node1("Specifier");$$->func = struct_specifier_handler;}
   ;
 StructSpecifier :
     STRUCT OptTag LC DefList RC {$$ = Node5("StructSpecifier");}
@@ -137,7 +138,7 @@ Stmt :
 
 //Local Definitions
 DefList :
-    Def DefList {$$ = Node2("DefList");}
+    Def DefList {$$ = Node2("DefList");$$ -> func = def_list_handler;}
   | %empty      {$$ = Node0("DefList");}
   ;
 Def :

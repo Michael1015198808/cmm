@@ -11,9 +11,9 @@ Type type_int;
 Type type_float;
 
 struct Type_ {
-    enum {BASIC, ARRAY, STRUCT, FUNCTION, NOTYPE} kind;
+    enum {BASIC, ARRAY, STRUCTURE, FUNCTION, NOTYPE} kind;
     union {
-        enum {INT, FLOAT} basic;
+        enum {T_INT, T_FLOAT} basic;
         struct {
             Type elem;
             int size;

@@ -4,6 +4,8 @@
 
 void preorder(node*);
 int error_cnt = 0;
+int yydebug = 1;
+
 int main(int argc, char** argv) {
     if(argc > 1) {
         if(!(yyin = fopen(argv[1], "r"))) {
@@ -16,6 +18,7 @@ int main(int argc, char** argv) {
     } else {
         if(!error_cnt) {
             preorder(root);
+            type_print(table_lookup("struct test"));
         }
     }
     return 0;
@@ -111,21 +114,12 @@ int syntax_error(int lineno, const char* fmt, ...) {
 }
 
 void preorder(node* cur) {
-    static int indent = 0;
-    printf("%*s", indent, "");
-    if(cur->cnt) {
-        printf("%s (%d)\n", cur->name, cur->lineno);
-        indent+=2;
+    if(cur -> func) {
+        cur -> func(cur);
+    } else {
         for(int i = 0; i < cur->cnt; ++i) {
             if(cur->siblings[i])
                 preorder(cur->siblings[i]);
-        }
-        indent-=2;
-    } else {
-        if(cur -> func) {
-            cur -> func(cur);
-        } else {
-            puts(cur->name);
         }
     }
 }

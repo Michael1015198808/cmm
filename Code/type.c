@@ -1,12 +1,13 @@
 #include "common.h"
+#include "table.h"
 #include "type.h"
 
 static struct Type_ type_int_ = {
     .kind = BASIC,
-    .basic = INT
+    .basic = T_INT
 }, type_float_ = {
     .kind = BASIC,
-    .basic = FLOAT
+    .basic = T_FLOAT
 };
 
 Type type_int = &type_int_;
@@ -22,7 +23,7 @@ Type to_array(Type base, int size) {
 
 Type to_struct(int cnt, ...) {
     Type ret = new(struct Type_);
-    ret -> kind = STRUCT;
+    ret -> kind = STRUCTURE;
     if(cnt == 0) {
         ret -> structure = NULL;
     } else {
@@ -66,14 +67,22 @@ Type to_func(Type ret_val, int cnt, ...) {
 
 Type get_type(node* cur) {
     if(IS("Specifier")) {
-        return get_type(cur -> siblings[0]);
+        cur = cur -> siblings[0];
+        switch(cur -> cnt) {
+            case 2:
+                {
+                    char buf[100];
+                    sprintf(buf, "struct %s", cur -> siblings[1] -> siblings[0] -> val_str);
+                    return table_lookup(buf);
+                }
+            case 5:
+                break;
+        }
     } else if(IS("TYPE")){
         Type ret = malloc(sizeof(struct Type_));
         ret -> kind = BASIC;
         ret -> basic = cur -> val_int;
         return ret;
-    } else {
-        TODO();
     }
     return NULL;
 }
@@ -101,7 +110,7 @@ int typecmp(Type t1, Type t2) {
             return t1 -> array.size != t2 -> array.size ||
                 typecmp(t1 -> array.elem, t2 -> array.elem);
             break;
-        case STRUCT:
+        case STRUCTURE:
         case FUNCTION:
             return fieldcmp(t1 -> structure, t2 -> structure);
             break;
@@ -116,20 +125,23 @@ int typecmp(Type t1, Type t2) {
 void static inline type_print_real(Type t, int indent) {
     switch(t -> kind) {
         case BASIC:
-            if(t -> basic == INT) {
+            if(t -> basic == T_INT) {
                 printf("%*sINT", indent, "");
-            } else {
+            } else if(t -> basic == T_FLOAT){
                 printf("%*sFLOAT", indent, "");
+            } else {
+                Assert();
             }
             break;
         case ARRAY:
             type_print_real(t -> array.elem, indent);
             printf("[%d]", t -> array.size);
             break;
-        case STRUCT:
+        case STRUCTURE:
             printf("struct {\n");
             for(FieldList cur = t -> structure; cur; cur = cur -> next) {
                 type_print_real(cur -> type, indent + 4);
+                printf(" %s",cur -> name);
                 putchar('\n');
             }
             printf("}");

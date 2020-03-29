@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include "log.h"
 
 #define YYSTYPE node*
 
@@ -20,7 +21,7 @@ int asprintf(char**, const char*, ...);
 int vasprintf(char**, const char*, va_list);
 
 typedef struct node node;
-typedef void(*handler)(node*);
+typedef void*(*handler)(node*);
 
 struct node {
     handler func;
@@ -70,6 +71,11 @@ int syntax_error(int lineno, const char* fmt, ...);
     } while(0)
 
 #define Assert() \
+    do { \
+        printf("%s: %d not implemented\n", __FILE__, __LINE__); \
+    } while(0)
+
+#define panic() \
     do { \
         printf("%s: %d not implemented\n", __FILE__, __LINE__); \
     } while(0)
