@@ -14,7 +14,7 @@
     #define Node6(name) Node(name, yylsp[-5].first_line, 6, yyvsp[-5], yyvsp[-4], yyvsp[-3], yyvsp[-2], yyvsp[-1], yyvsp[0])
     #define Node7(name) Node(name, yylsp[-6].first_line, 7, yyvsp[-6], yyvsp[-5], yyvsp[-4], yyvsp[-3], yyvsp[-2], yyvsp[-1], yyvsp[0])
     int yyerror(char* msg) {}
-    const char* get_vardec_name();
+    char* get_vardec_name();
 %}
 
 %nonassoc LOWEST
@@ -66,11 +66,11 @@ ExtDefList :
 ExtDef :
     Specifier ExtDecList x_SEMI   {$$ = Node3("ExtDef");$$ -> func = def_handler;}
   | Specifier x_SEMI              {$$ = Node2("ExtDef");$$ -> func = def_handler;}
-  | Specifier FunDec CompSt       {$$ = Node3("ExtDef");}
+  | Specifier FunDec CompSt       {$$ = Node3("ExtDef");$$ -> func = fun_dec_handler;}
   | error SEMI                    {syntax_error(@1.first_line, "Something wrong with declaration.");}
   ;
 ExtDecList :
-    VarDec                  {$$ = Node1("ExtDecList");}
+    VarDec                  {$$ = Node1("ExtDecList");$$ -> func = vardec_handler;}
   | VarDec COMMA ExtDecList {$$ = Node3("ExtDecList");}
   ;
 
@@ -94,8 +94,8 @@ Tag :
 
 //Declarators
 VarDec :
-    ID                    {$$ = Node1("VarDec");}
-  | VarDec LB INT x_RB    {$$ = Node4("VarDec");}
+    ID                    {$$ = Node1("VarDec");$$ -> func = variable_handler;}
+  | VarDec LB INT x_RB    {$$ = Node4("VarDec");$$ -> func = array_dec_handler;}
   | VarDec LB error RB    {syntax_error(@3.first_line, "Size of array %s should be an integer.", get_vardec_name($1));$$ = Node0("VarDec");}
   ;
 FunDec :
@@ -128,7 +128,7 @@ Stmt :
   | LP error RP SEMI{syntax_error(@2.first_line, "Expect expression before ')'.");}
   | LP Exp SEMI %prec LOWEST {syntax_error(@1.first_line, "Missing \")\".");}
   | CompSt                                  {$$ = Node1("Stmt");}
-  | RETURN Exp x_SEMI                       {$$ = Node3("Stmt");}
+  | RETURN Exp x_SEMI                       {$$ = Node3("Stmt");$$ -> func = return_handler;}
   | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {$$ = Node5("Stmt");}
   | IF LP Exp RP Stmt ELSE Stmt             {$$ = Node7("Stmt");}
   | WHILE LP Exp RP Stmt                    {$$ = Node5("Stmt");}
@@ -138,7 +138,7 @@ Stmt :
 
 //Local Definitions
 DefList :
-    Def DefList {$$ = Node2("DefList");$$ -> func = def_list_handler;}
+    Def DefList {$$ = Node2("DefList");}
   | %empty      {$$ = Node0("DefList");}
   ;
 Def :
@@ -149,17 +149,17 @@ DecList :
   | Dec COMMA DecList   {$$ = Node3("DecList");}
   ;
 Dec :
-    VarDec              {$$ = Node1("Dec");}
-  | VarDec ASSIGNOP Exp {$$ = Node3("Dec");}
+    VarDec              {$$ = Node1("Dec");$$ -> func = vardec_handler;}
+  | VarDec ASSIGNOP Exp {$$ = Node3("Dec");$$ -> func = vardec_handler;}
   ;
 
 //Expressions
 Exp :
-    Exp ASSIGNOP Exp    {$$ = Node3("Exp");}
+    Exp ASSIGNOP Exp    {$$ = Node3("Exp");$$ -> func = assign_handler;}
   | Exp AND Exp         {$$ = Node3("Exp");}
   | Exp OR Exp          {$$ = Node3("Exp");}
   | Exp RELOP Exp       {$$ = Node3("Exp");}
-  | Exp PLUS Exp        {$$ = Node3("Exp");}
+  | Exp PLUS Exp        {$$ = Node3("Exp");$$ -> func = binary_op_handler;}
   | Exp MINUS Exp       {$$ = Node3("Exp");}
   | Exp STAR Exp        {$$ = Node3("Exp");}
   | Exp DIV Exp         {$$ = Node3("Exp");}
@@ -167,14 +167,14 @@ Exp :
   | MINUS Exp %prec HIGHER_THAN_MINUS
                         {$$ = Node2("Exp");}
   | NOT Exp             {$$ = Node2("Exp");}
-  | ID LP Args RP       {$$ = Node4("Exp");}
+  | ID LP Args RP       {$$ = Node4("Exp");$$ -> func = fun_call_handler;}
   | ID LP error RP      {syntax_error(@3.first_line, "Expect expression before ')'.");}
-  | ID LP RP            {$$ = Node3("Exp");}
-  | Exp LB Exp x_RB     {$$ = Node4("Exp");}
-  | Exp DOT ID          {$$ = Node3("Exp");}
-  | ID                  {$$ = Node1("Exp");}
-  | INT                 {$$ = Node1("Exp");}
-  | FLOAT               {$$ = Node1("Exp");}
+  | ID LP RP            {$$ = Node3("Exp");$$ -> func = fun_call_handler;}
+  | Exp LB Exp x_RB     {$$ = Node4("Exp");$$ -> func = array_access_handler;}
+  | Exp DOT ID          {$$ = Node3("Exp");$$ -> func = struct_access_handler;}
+  | ID                  {$$ = Node1("Exp");$$ -> func = id_handler;}
+  | INT                 {$$ = Node1("Exp");$$ -> func = int_handler;}
+  | FLOAT               {$$ = Node1("Exp");$$ -> func = float_handler;}
   ;
 Bad_exp :
     Exp ASSIGNOP

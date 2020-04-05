@@ -17,13 +17,16 @@ YFC = $(shell find ./ -name "*.y" | sed s/[^/]*\\.y/syntax.tab.c/)
 LFO = $(LFC:.c=.o)
 YFO = $(YFC:.c=.o)
 
-TEST_IN = $(shell find ../Test -name "*.cmm")
+TEST_IN = $(shell find ../Test -name "lab2-*.cmm")
 TEST_CASE = $(TEST_IN:.cmm=)
 TEST_OUT = $(TEST_IN:.cmm=.out)
 
-parser: syntax $(filter-out $(LFO),$(OBJS))
+parser: syntax $(filter-out $(LFO),$(OBJS)) tags
 	$(CC) -o parser $(filter-out $(LFO),$(OBJS)) -lfl -ly
 	@cp parser ../
+
+tags: $(filter-out $(LFO),$(OBJS))
+	ctags -R .
 
 syntax: lexical syntax-c
 	$(CC) -c $(YFC) -o $(YFO)
@@ -53,7 +56,7 @@ test: parser
 	do \
 		./parser $$case.cmm > temp.out; \
 		if diff temp.out $$case.out >/dev/null; \
-			then true; \
+			then echo PASS $$case; \
 			else echo Wrong on $$case;\
 		fi; \
 		rm temp.out; \
@@ -67,10 +70,10 @@ gen: parser $(TEST_OUT)
 runall: parser $(TEST_OUT)
 	@for case in $(TEST_CASE); \
 	do \
-	echo $$case.cmm; \
-	cat $$case.cmm; \
-	echo $$case.out; \
-	cat $$case.out; \
+		echo $$case.cmm; \
+		cat $$case.cmm; \
+		echo $$case.out; \
+		cat $$case.out; \
 	done;
 run: parser
 	@./parser ../Test/temp.cmm

@@ -26,6 +26,7 @@ int hash(const char* name) {
 }
 
 int table_insert(const char* name, Type type) {
+    if(table_lookup(name)) return -1;
     my_log("Inserting %s\n", name);
     int x = hash(name);
     tab* p = malloc(sizeof(tab));

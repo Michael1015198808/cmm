@@ -18,7 +18,6 @@ int main(int argc, char** argv) {
     } else {
         if(!error_cnt) {
             preorder(root);
-            type_print(table_lookup("struct test"));
         }
     }
     return 0;
@@ -90,28 +89,6 @@ int main(int argc, char** argv) {
 }
 */
 
-int lexical_error(int lineno, const char* fmt, ...) {
-    ++error_cnt;
-    va_list ap;
-    va_start(ap, fmt);
-    printf("Error type A at Line %d: ", lineno);
-    vprintf(fmt, ap);
-    putchar('\n');
-}
-
-int syntax_error(int lineno, const char* fmt, ...) {
-    static int last_line = 0;
-    if(lineno == last_line) {
-        return -1;//Prevent reporting too much errors
-    }
-    last_line = lineno;
-    ++error_cnt;
-    va_list ap;
-    va_start(ap, fmt);
-    printf("Error type B at Line %d: ", lineno);
-    vprintf(fmt, ap);
-    putchar('\n');
-}
 
 void preorder(node* cur) {
     if(cur -> func) {

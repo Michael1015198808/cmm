@@ -99,26 +99,29 @@ static int fieldcmp(FieldList f1, FieldList f2) {
     }
 }
 int typecmp(Type t1, Type t2) {
-    if(t1 -> kind != t2 -> kind) {
-        return 1;
-    }
-    switch(t1 -> kind) {
-        case BASIC:
-            return t1 -> basic != t2 -> basic;
-            break;
-        case ARRAY:
-            return t1 -> array.size != t2 -> array.size ||
-                typecmp(t1 -> array.elem, t2 -> array.elem);
-            break;
-        case STRUCTURE:
-        case FUNCTION:
-            return fieldcmp(t1 -> structure, t2 -> structure);
-            break;
-        case NOTYPE:
-            Assert();
-            break;
-        default:
-            Assert();
+    if(t1 && t1) {
+        if(t1 -> kind != t2 -> kind) {
+            return 1;
+        }
+        switch(t1 -> kind) {
+            case BASIC:
+                return t1 -> basic != t2 -> basic;
+                break;
+            case ARRAY:
+                return typecmp(t1 -> array.elem, t2 -> array.elem);
+                break;
+            case STRUCTURE:
+            case FUNCTION:
+                return fieldcmp(t1 -> structure, t2 -> structure);
+                break;
+            case NOTYPE:
+                panic();
+                break;
+            default:
+                panic();
+        }
+    } else {
+        return (t1 == NULL) ^ (t2 == NULL);
     }
 }
 
@@ -130,7 +133,7 @@ void static inline type_print_real(Type t, int indent) {
             } else if(t -> basic == T_FLOAT){
                 printf("%*sFLOAT", indent, "");
             } else {
-                Assert();
+                panic();
             }
             break;
         case ARRAY:
@@ -159,11 +162,45 @@ void static inline type_print_real(Type t, int indent) {
             printf(")");
             break;
         default:
-            Assert();
+            panic();
             break;
     }
 }
 void type_print(Type t) {
     type_print_real(t, 0);
     putchar('\n');
+}
+int type_to_str(Type t, char* buf) {
+    int idx = 0;
+    switch(t -> kind) {
+        case BASIC:
+            if(t -> basic == T_INT) {
+                return sprintf(buf, "int");
+            } else if(t -> basic == T_FLOAT){
+                return sprintf(buf, "float");
+            } else {
+                panic();
+            }
+            break;
+        case ARRAY:
+            panic();
+            break;
+        case STRUCTURE:
+            panic();
+            break;
+        case FUNCTION:
+            idx += sprintf(buf + idx, "(");
+            for(FieldList cur = t -> structure -> next; cur; cur = cur -> next) {
+                idx += type_to_str(cur -> type, buf + idx);
+                if(cur -> next) {
+                    idx += sprintf(buf + idx, ", ");
+                }
+            }
+            idx += sprintf(buf + idx, ")");
+            break;
+        default:
+            panic();
+            break;
+    }
+    return idx;
 }

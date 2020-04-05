@@ -13,7 +13,7 @@ void my_log(const char* fmt, ...) {
     if(log_fd == -1) {
         log_fd = open("./my_log", O_WRONLY | O_CREAT, 0777);
         if(log_fd < 0) {
-            sprintf(stderr, "Error occured when opening ./my_log\n");
+            fprintf(stderr, "Error occured when opening ./my_log\n");
             exit(-1);
         }
     }

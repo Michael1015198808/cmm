@@ -11,6 +11,11 @@
 
 #define new(type) (type*)malloc(sizeof(type));
 
+int lexical_error(int lineno, const char* fmt, ...);
+int syntax_error(int lineno, const char* fmt, ...);
+int semantic_error(int lineno, int errorno, ...);
+int vsemantic_error(int lineno, int errorno, va_list);
+
 extern FILE* yyin;
 int yylineno;
 int yylex();
@@ -29,11 +34,13 @@ struct node {
     int cnt, lineno;
     union {
         struct node** siblings;
-        const char* val_str;
+        char* val_str;
         unsigned int val_int;
         float val_float;
     };
 };
+#define foreach(name, init, next) \
+    for(node* name = cur -> siblings[init];;name = name -> siblings[next])
 
 node* root;
 
@@ -62,17 +69,16 @@ static inline node* Singleton(const char* fmt, ...) {
     return Node(buf, yylineno, 0);
 }
 
-int lexical_error(int lineno, const char* fmt, ...);
-int syntax_error(int lineno, const char* fmt, ...);
+void preorder(node* cur);
 
 #define TODO() \
     do { \
         printf("%s: %d not implemented\n", __FILE__, __LINE__); \
     } while(0)
 
-#define Assert() \
-    do { \
-        printf("%s: %d not implemented\n", __FILE__, __LINE__); \
+#define Assert(cond) \
+    if(!(cond)) { \
+        printf("%s: %d assertion %s failed!\n", __FILE__, __LINE__, #cond); \
     } while(0)
 
 #define panic() \
