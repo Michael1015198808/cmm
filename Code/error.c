@@ -43,6 +43,8 @@ static char* semantic_errors_msg[] = {
     [REDEFINE_FIELD]    = "Redefined field \"%s\".\n",
    [DUPLICATE_NAME]     = "Duplicated name \"%s\".\n",
     [UNDEFINE_STRUCTURE]= "Undefined structure \"%s\".\n",
+[DEC_UNDEFINE_FUNCTION] = "Undefined function \"%s\".\n",
+    [INCONSIS_DEC]      = "Inconsistent declaration of function \"%s\".\n",
 };
 
 int vsemantic_error(int lineno, int errorno, va_list ap) {

@@ -20,7 +20,7 @@ void* type_printer(node* node) {
             puts("float");
             break;
         default:
-            Assert();
+            panic();
     }
     return NULL;
 }

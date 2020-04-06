@@ -22,12 +22,19 @@ make_handler(def) {
 
 make_handler(vardec) {
     node* vardec = cur -> siblings[0];
-    if(table_insert(get_vardec_name(vardec), vardec -> func(vardec))) {
-        semantic_error(cur -> lineno, REDEFINE_VARIABLE, get_vardec_name(cur -> siblings[0]));
+    const char* const name = get_vardec_name(vardec);
+    if(table_insert(name, vardec -> func(vardec))) {
+        semantic_error(cur -> lineno, REDEFINE_VARIABLE, name);
     };
 }
 
-make_handler(variable) {
+make_handler(array_dec) {// cur : VarDec -> VarDec LB INT RB
+    node* vardec = cur -> siblings[0];
+    Type t = vardec -> func(vardec);
+    return to_array(t, cur -> siblings[2] -> val_int);
+}
+
+make_handler(variable) {// cur : VarDec -> ID
     return cur_def_type;
 }
 /*
@@ -105,8 +112,9 @@ make_handler(struct_specifier) {
                 ret -> kind = STRUCTURE;
                 ret -> structure = deflist_to_structure(def_list);
                 if(cur -> siblings[1]) {
-                    sprintf(buf, "struct %s", cur -> siblings[1] -> siblings[0] -> val_str);
-                    if(table_insert(buf, ret)) {
+                    char* struct_name;
+                    asprintf(&struct_name, "struct %s", cur -> siblings[1] -> siblings[0] -> val_str);
+                    if(table_insert(struct_name, ret)) {
                         semantic_error(cur -> lineno, DUPLICATE_NAME, cur -> siblings[1] -> siblings[0] -> val_str);
                     }
                 }
@@ -124,15 +132,15 @@ make_handler(def_list) {
 
 static Type cur_fun_ret_type = NULL;
 
-make_handler(fun_dec) { // cur : Specifier FunDec CompSt
-    //Type to_func(Type ret_val, int cnt, ...) {
-    Type t = new(struct Type_);
-    t -> kind = FUNCTION;
-    t -> structure = new(struct FieldList_);
-    t -> structure -> name = "";
-    t -> structure -> type = cur -> siblings[0] -> func(cur -> siblings[0]);
+static Type fun_parsing(node* cur, int is_dec) {
+    Type ret = new(struct Type_);
+    ret -> kind = FUNCTION;
+    ret -> is_dec = is_dec;
+    ret -> structure = new(struct FieldList_);
+    ret -> structure -> name = "";
+    ret -> structure -> type = cur -> siblings[0] -> func(cur -> siblings[0]);
 
-    FieldList last = t -> structure;
+    FieldList last = ret -> structure;
     if(cur -> siblings[1] -> cnt == 4) {
         for(node* varlist = cur -> siblings[1] -> siblings[2]; ;varlist = varlist -> siblings[2]) {
             node* paramdec = varlist -> siblings[0];
@@ -147,11 +155,62 @@ make_handler(fun_dec) { // cur : Specifier FunDec CompSt
         }
     }
     last -> next = NULL;
+    return ret;
+}
+
+struct fun_dec_list {
+    int lineno;
+    const char* name;
+    Type t;
+    struct fun_dec_list* next;
+};
+static struct fun_dec_list* head = NULL;
+
+void fun_dec_checker() {
+    for(struct fun_dec_list* cur = head; cur; cur = cur -> next) {
+        if(cur -> t -> is_dec) {
+            semantic_error(cur -> lineno, DEC_UNDEFINE_FUNCTION, cur -> name);
+        }
+    }
+}
+
+make_handler(fun_dec) { // cur : Specifier FunDec CompSt
+    Type t = fun_parsing(cur, 1);
+    const char *const name = cur -> siblings[1] -> siblings[0] -> val_str;
+    const int lineno = cur -> siblings[1] -> siblings[0] -> lineno;
+    if(table_insert(name, t)) {
+        Type old = table_lookup(name);
+        if(typecmp(old, t)) {
+            semantic_error(lineno, INCONSIS_DEC, name);
+        }
+    } else {
+        struct fun_dec_list* tmp = new(struct fun_dec_list);
+        tmp -> lineno = lineno;
+        tmp -> name = name;
+        tmp -> t = t;
+        tmp -> next = head;
+        head = tmp;
+    }
+}
+
+make_handler(fun_def) { // cur : Specifier FunDec CompSt
+    //Type to_func(Type ret_val, int cnt, ...) {
+    Type t = fun_parsing(cur, 0);
     if(table_insert(cur -> siblings[1] -> siblings[0] -> val_str, t)) {
-        semantic_error(cur -> siblings[1] -> siblings[0] -> lineno, REDEFINE_FUNCTION, cur -> siblings[1] -> siblings[0] -> val_str);
+        Type old = table_lookup(cur -> siblings[1] -> siblings[0] -> val_str);
+        if(old -> is_dec) {
+            old -> is_dec = 0;
+            if(typecmp(old, t)) {
+                semantic_error(cur -> siblings[1] -> siblings[0] -> lineno, INCONSIS_DEC, cur -> siblings[1] -> siblings[0] -> val_str);
+            }
+        } else {
+            semantic_error(cur -> siblings[1] -> siblings[0] -> lineno, REDEFINE_FUNCTION, cur -> siblings[1] -> siblings[0] -> val_str);
+        }
     }
     cur_fun_ret_type = t -> structure -> type;
+    new_scope();
     preorder(cur -> siblings[2]);
+    free_scope();
     cur_fun_ret_type = NULL;
     return NULL;
 }
@@ -164,12 +223,7 @@ Type type_check(Type lhs, Type rhs, Type ret, int lineno, semantic_errors err, .
     va_list ap;
     va_start(ap, err);
 
-    if(lhs && rhs) {
-        if(lhs -> kind == BASIC && rhs -> kind == BASIC) {
-            if(lhs -> basic == rhs -> basic) {
-                return lhs;
-            }
-        }
+    if(lhs && rhs && typecmp(lhs, rhs)) {
         vsemantic_error(lineno, err, ap);
     }
     if(ret) return ret;
@@ -306,13 +360,6 @@ make_handler(return) {// cur : RETURN Exp SEMI
     return NULL;
 }
 
-make_handler(array_dec) {// cur : VarDec LB INT RB
-    node* vardec = cur -> siblings[0];
-    get_vardec_name(vardec);
-    Type t = vardec -> func(vardec);
-    return to_array(t, cur -> siblings[2] -> val_int);
-}
-
 make_handler(struct_access) {// cur : Exp DOT ID
     node* exp = cur -> siblings[0];
     Type t = exp -> func(exp);
@@ -327,3 +374,4 @@ make_handler(struct_access) {// cur : Exp DOT ID
     }
     semantic_error(exp -> lineno, NONEXIST_FIELD, cur -> siblings[2] -> val_str);
 }
+

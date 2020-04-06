@@ -66,7 +66,8 @@ ExtDefList :
 ExtDef :
     Specifier ExtDecList x_SEMI   {$$ = Node3("ExtDef");$$ -> func = def_handler;}
   | Specifier x_SEMI              {$$ = Node2("ExtDef");$$ -> func = def_handler;}
-  | Specifier FunDec CompSt       {$$ = Node3("ExtDef");$$ -> func = fun_dec_handler;}
+  | Specifier FunDec CompSt       {$$ = Node3("ExtDef");$$ -> func = fun_def_handler;}
+  | Specifier FunDec SEMI         {$$ = Node3("ExtDef");$$ -> func = fun_dec_handler;}
   | error SEMI                    {syntax_error(@1.first_line, "Something wrong with declaration.");}
   ;
 ExtDecList :

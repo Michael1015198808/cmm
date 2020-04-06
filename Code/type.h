@@ -18,9 +18,12 @@ struct Type_ {
             Type elem;
             int size;
         } array;
-        FieldList structure;
-        //function used this as well
-        //return type -> arg1 -> arg2 -> ...
+        struct {
+            //function used this as well
+            //return type -> arg1 -> arg2 -> ...
+            FieldList structure;
+            int is_dec;
+        };
     };
 };
 

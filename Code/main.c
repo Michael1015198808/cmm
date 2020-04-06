@@ -17,7 +17,10 @@ int main(int argc, char** argv) {
         syntax_error(yylineno, "End Of File unsupposed!");
     } else {
         if(!error_cnt) {
+            init_hash_table();
             preorder(root);
+            void fun_dec_checker();
+            fun_dec_checker();
         }
     }
     return 0;

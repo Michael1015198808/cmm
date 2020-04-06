@@ -17,6 +17,7 @@ make_handler(assign);
 make_handler(def);
 make_handler(def_list);
 make_handler(fun_dec);
+make_handler(fun_def);
 make_handler(type);
 make_handler(struct_specifier);
 make_handler(null);

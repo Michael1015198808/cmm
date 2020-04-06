@@ -19,6 +19,8 @@ typedef enum {
     REDEFINE_FIELD    = 15,
    DUPLICATE_NAME     = 16,
     UNDEFINE_STRUCTURE= 17,
+DEC_UNDEFINE_FUNCTION = 18,
+    INCONSIS_DEC      = 19,
 } semantic_errors;
 
 #endif //__ERROR_H__
