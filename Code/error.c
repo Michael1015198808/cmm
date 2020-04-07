@@ -9,6 +9,7 @@ int lexical_error(int lineno, const char* fmt, ...) {
     printf("Error type A at Line %d: ", lineno);
     vprintf(fmt, ap);
     putchar('\n');
+    return 0;
 }
 
 int syntax_error(int lineno, const char* fmt, ...) {
@@ -23,6 +24,7 @@ int syntax_error(int lineno, const char* fmt, ...) {
     printf("Error type B at Line %d: ", lineno);
     vprintf(fmt, ap);
     putchar('\n');
+    return 0;
 }
 
 static char* semantic_errors_msg[] = {
@@ -34,10 +36,10 @@ static char* semantic_errors_msg[] = {
                [LVALUE] = "The left-hand side of an assignment must be a variable.\n",
      [OPERAND_MISMATCH] = "Type mismatched for operands.\n",
       [RETURN_MISMATCH] = "Type mismatched for return.\n",
-    [FUNCTION_MISMATCH] = "Function \"%s%s\" is not applicable for arguments \"%s\".\n",
-         [NOT_ARRAY]    = "\"%s\" is not an array.\n",
+    [FUNCTION_MISMATCH] = "Function \"%s\" is not applicable for given arguments.\n",
+         [NOT_ARRAY]    = "Not an array.\n",
          [NOT_FUNCTION] = "\"%s\" is not a function.\n",
-         [NOT_INT]      = "\"%s\" is not an integer.\n",
+         [NOT_INT]      = "Not an integer.\n",
      [ILLEGAL_USE]      = "Illegal use of \"%s\".\n",
     [NONEXIST_FIELD]    = "Non-existent field \"%s\".\n",
     [REDEFINE_FIELD]    = "Redefined field \"%s\".\n",
@@ -48,8 +50,10 @@ static char* semantic_errors_msg[] = {
 };
 
 int vsemantic_error(int lineno, int errorno, va_list ap) {
-    printf("Error type %d at Line %d: ", errorno, lineno);
-    vprintf(semantic_errors_msg[errorno], ap);
+    int ret = 0;
+    ret += printf("Error type %d at Line %d: ", errorno, lineno);
+    ret +=  vprintf(semantic_errors_msg[errorno], ap);
+    return ret;
 }
 int semantic_error(int lineno, int errorno, ...) {
     va_list ap;

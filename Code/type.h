@@ -11,7 +11,7 @@ Type type_int;
 Type type_float;
 
 struct Type_ {
-    enum {BASIC, ARRAY, STRUCTURE, FUNCTION, NOTYPE} kind;
+    enum {BASIC, ARRAY, STRUCTURE, STRUCTURE_DEF, FUNCTION, NOTYPE} kind;
     union {
         enum {T_INT, T_FLOAT} basic;
         struct {
@@ -36,7 +36,6 @@ struct FieldList_ {
 Type to_array(Type type, int size);
 Type to_struct(int cnt, ...);
 Type to_func(Type ret_val, int cnt, ...);
-Type get_type(node*);
 int typecmp(Type t1, Type t2);
 void type_print(Type t);
 

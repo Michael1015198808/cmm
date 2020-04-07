@@ -11,6 +11,14 @@
 
 #define new(type) (type*)malloc(sizeof(type));
 
+static inline void* free_first(void* ptr1, void* ptr2) {
+    free(ptr1);
+    return ptr2;
+}
+
+#define remove_access(vari, field) \
+    free_first(vari, vari -> field)
+
 int lexical_error(int lineno, const char* fmt, ...);
 int syntax_error(int lineno, const char* fmt, ...);
 int semantic_error(int lineno, int errorno, ...);

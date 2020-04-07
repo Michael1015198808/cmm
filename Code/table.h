@@ -5,6 +5,7 @@
 
 void init_hash_table();
 int table_insert_global(const char*,Type);
+int table_insert_struct(const char*,Type);
 int table_insert(const char*,Type);
 Type table_lookup(const char*);
 

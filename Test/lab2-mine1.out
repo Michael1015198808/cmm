@@ -1,1 +1,1 @@
-Error type 9 at Line 8: Function "func(int)" is not applicable for arguments "(void)".
+Error type 9 at Line 8: Function "func" is not applicable for given arguments.

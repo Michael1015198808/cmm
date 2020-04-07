@@ -21,6 +21,8 @@ int main(int argc, char** argv) {
             preorder(root);
             void fun_dec_checker();
             fun_dec_checker();
+            void free_tree(node* cur);
+            free_tree(root);
         }
     }
     return 0;
@@ -36,6 +38,7 @@ int hash_test() {
     printf("%d\n", hash("1234567654321"));
     printf("%d\n", hash("a1234567654320"));
     printf("%d\n", hash("a2234567654321"));
+    return 0;
 }
 int array_test() {
     Type arr1 = to_array(type_int, 10);
@@ -53,6 +56,7 @@ int array_test() {
     assert(typecmp(arr1, arr2));
     assert(typecmp(arr1, arr3));
     assert(typecmp(arr2, arr3));
+    return 0;
 }
 int struct_test() {
     Type stru1 = to_struct(1, "i", type_int);
@@ -68,6 +72,7 @@ int struct_test() {
     assert(!typecmp(stru1, stru3));
     assert(typecmp(stru1, stru2));
     assert(typecmp(stru2, stru3));
+    return 0;
 }
 int func_test() {
     Type func1 = to_func(type_int, 0);
@@ -81,6 +86,7 @@ int func_test() {
     assert(!typecmp(func1, func3));
     assert(typecmp(func1, func2));
     assert(typecmp(func2, func3));
+    return 0;
 }
 /*
 int main(int argc, char** argv) {
@@ -92,7 +98,6 @@ int main(int argc, char** argv) {
 }
 */
 
-
 void preorder(node* cur) {
     if(cur -> func) {
         cur -> func(cur);
@@ -102,4 +107,12 @@ void preorder(node* cur) {
                 preorder(cur->siblings[i]);
         }
     }
+}
+
+void free_tree(node* cur) {
+    for(int i = 0; i < cur->cnt; ++i) {
+        if(cur->siblings[i])
+            free_tree(cur->siblings[i]);
+    }
+    free(cur);
 }

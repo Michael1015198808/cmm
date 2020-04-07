@@ -1,4 +1,5 @@
 #include <string.h>
+#include <limits.h>
 #include "common.h"
 #include "table.h"
 
@@ -11,7 +12,7 @@ struct tab{
     Type type;
     const char* name;
     tab* next;
-    int depth;
+    unsigned depth;
 };
 static int depth = 0;
 
@@ -58,19 +59,18 @@ void new_scope() {
 }
 
 void free_scope() {
-    for(struct LNode* cur = cur_list -> dec; cur; cur = cur -> next) {
+    for(struct LNode* cur = cur_list -> dec; cur; cur = remove_access(cur, next)) {
         tab* to_rm = cur -> pre -> next;
-        cur -> pre -> next = to_rm -> next;
         if(to_rm -> next == NULL) {
             table_tail[hash(to_rm -> name)] = cur -> pre;
         }
-        free(to_rm);
+        cur -> pre -> next = remove_access(to_rm, next);
     }
-    cur_list = cur_list -> pre;
+    cur_list = remove_access(cur_list, pre);
     --depth;
 }
 
-static int table_insert_real(const char* name, Type type, int _depth) {
+static int table_insert_real(const char* name, Type type, unsigned _depth) {
     my_log("Inserting %s\n", name);
     int x = hash(name);
     tab* p = new(tab);
@@ -84,15 +84,23 @@ static int table_insert_real(const char* name, Type type, int _depth) {
     return 0;
 }
 
+int table_insert_struct(const char* name, Type type) {
+    //name will not be copied
+    if(table_lookup(name)) return -1;
+    return table_insert_real(name, type, UINT_MAX);
+}
+
 int table_insert_global(const char* name, Type type) {
     //name will not be copied
     if(table_lookup(name)) return -1;
     return table_insert_real(name, type, 0);
 }
 
+static Type table_lookup_real(const char* name, int depth);
+
 int table_insert(const char* name, Type type) {
     //name will not be copied
-    if(table_lookup(name)) return -1;
+    if(table_lookup_real(name, depth)) return -1;
     if(depth > 0) {
         struct LNode* tmp = new(struct LNode);
         tmp -> next = cur_list -> dec;
@@ -102,11 +110,11 @@ int table_insert(const char* name, Type type) {
     return table_insert_real(name, type, depth);
 }
 
-Type table_lookup(const char* name) {
+static Type table_lookup_real(const char* name, int depth) {
     int x = hash(name);
     tab* ret = NULL;
     for(tab* p = table[x] -> next;p; p = p -> next) {
-        if(!strcmp(p -> name, name)) {
+        if(p -> depth >= depth && !strcmp(p -> name, name)) {
             ret = p;
         }
     }
@@ -115,4 +123,7 @@ Type table_lookup(const char* name) {
     } else {
         return NULL;
     }
+}
+Type table_lookup(const char* name) {
+    return table_lookup_real(name, 0);
 }

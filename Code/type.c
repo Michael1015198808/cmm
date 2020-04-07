@@ -65,29 +65,6 @@ Type to_func(Type ret_val, int cnt, ...) {
     return ret;
 }
 
-Type get_type(node* cur) {
-    if(IS("Specifier")) {
-        cur = cur -> siblings[0];
-        switch(cur -> cnt) {
-            case 2:
-                {
-                    char buf[100];
-                    sprintf(buf, "struct %s", cur -> siblings[1] -> siblings[0] -> val_str);
-                    return table_lookup(buf);
-                }
-            case 5:
-                break;
-        }
-    } else if(IS("TYPE")){
-        Type ret = malloc(sizeof(struct Type_));
-        ret -> kind = BASIC;
-        ret -> basic = cur -> val_int;
-        return ret;
-    }
-    return NULL;
-}
-
-int typecmp(Type, Type);
 static int fieldcmp(FieldList f1, FieldList f2) {
     if(typecmp(f1 -> type, f2 -> type)) {
         return 1;
@@ -98,6 +75,7 @@ static int fieldcmp(FieldList f1, FieldList f2) {
         return f1 -> next || f2 -> next;
     }
 }
+
 int typecmp(Type t1, Type t2) {
     if(t1 && t1) {
         if(t1 -> kind != t2 -> kind) {
@@ -106,19 +84,14 @@ int typecmp(Type t1, Type t2) {
         switch(t1 -> kind) {
             case BASIC:
                 return t1 -> basic != t2 -> basic;
-                break;
             case ARRAY:
                 return typecmp(t1 -> array.elem, t2 -> array.elem);
-                break;
             case STRUCTURE:
             case FUNCTION:
                 return fieldcmp(t1 -> structure, t2 -> structure);
-                break;
-            case NOTYPE:
-                panic();
-                break;
             default:
                 panic();
+                return 1;
         }
     } else {
         return (t1 == NULL) ^ (t2 == NULL);
@@ -166,10 +139,12 @@ void static inline type_print_real(Type t, int indent) {
             break;
     }
 }
+
 void type_print(Type t) {
     type_print_real(t, 0);
     putchar('\n');
 }
+
 int type_to_str(Type t, char* buf) {
     int idx = 0;
     switch(t -> kind) {

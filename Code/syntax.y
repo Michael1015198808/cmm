@@ -72,7 +72,7 @@ ExtDef :
   ;
 ExtDecList :
     VarDec                  {$$ = Node1("ExtDecList");$$ -> func = vardec_handler;}
-  | VarDec COMMA ExtDecList {$$ = Node3("ExtDecList");}
+  | VarDec COMMA ExtDecList {$$ = Node3("ExtDecList");$$ -> func = extdeclist_handler;}
   ;
 
 //Specifiers
@@ -116,7 +116,7 @@ ParamDec :
 
 //Statements
 CompSt :
-    LC DefList StmtList RC  {$$ = Node4("CompSt");}
+    LC DefList StmtList RC  {$$ = Node4("CompSt");$$ -> func = compst_handler;}
   | LC DefList error RC     {syntax_error(@3.first_line, "Error in the sentence(missing ;?).");$$ = Node3("CompSt");}
   ;
 StmtList :
@@ -125,14 +125,14 @@ StmtList :
   ;
 Stmt :
     Exp x_SEMI                              {$$ = Node2("Stmt");}
-  | Bad_exp error {syntax_error(@2.first_line, "Something wrong with the expression(expect expression before token '%s' ).", yylval->name);} SEMI                      
-  | LP error RP SEMI{syntax_error(@2.first_line, "Expect expression before ')'.");}
-  | LP Exp SEMI %prec LOWEST {syntax_error(@1.first_line, "Missing \")\".");}
   | CompSt                                  {$$ = Node1("Stmt");}
   | RETURN Exp x_SEMI                       {$$ = Node3("Stmt");$$ -> func = return_handler;}
-  | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {$$ = Node5("Stmt");}
-  | IF LP Exp RP Stmt ELSE Stmt             {$$ = Node7("Stmt");}
-  | WHILE LP Exp RP Stmt                    {$$ = Node5("Stmt");}
+  | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {$$ = Node5("Stmt");$$ -> func = if_handler;}
+  | IF LP Exp RP Stmt ELSE Stmt             {$$ = Node7("Stmt");$$ -> func = if_handler;}
+  | WHILE LP Exp RP Stmt                    {$$ = Node5("Stmt");$$ -> func = while_handler;}
+  | LP Exp SEMI %prec LOWEST                {syntax_error(@1.first_line, "Missing \")\".");}
+  | Bad_exp error                           {syntax_error(@2.first_line, "Something wrong with the expression(expect expression before token '%s' ).", yylval->name);} SEMI                      
+  | LP error RP SEMI                        {syntax_error(@2.first_line, "Expect expression before ')'.");}
   | IF LP error RP Stmt                     {syntax_error(@3.first_line, "Expected expression before ')'.");$$ = Node0("Stmt");}
   | error SEMI                              {syntax_error(@1.first_line, "Something wrong with the statement.");}
   ;
@@ -157,25 +157,25 @@ Dec :
 //Expressions
 Exp :
     Exp ASSIGNOP Exp    {$$ = Node3("Exp");$$ -> func = assign_handler;}
-  | Exp AND Exp         {$$ = Node3("Exp");}
-  | Exp OR Exp          {$$ = Node3("Exp");}
-  | Exp RELOP Exp       {$$ = Node3("Exp");}
+  | Exp AND Exp         {$$ = Node3("Exp");$$ -> func = logic_handler;}
+  | Exp OR Exp          {$$ = Node3("Exp");$$ -> func = logic_handler;}
+  | Exp RELOP Exp       {$$ = Node3("Exp");$$ -> func = relop_handler;}
   | Exp PLUS Exp        {$$ = Node3("Exp");$$ -> func = binary_op_handler;}
-  | Exp MINUS Exp       {$$ = Node3("Exp");}
-  | Exp STAR Exp        {$$ = Node3("Exp");}
-  | Exp DIV Exp         {$$ = Node3("Exp");}
-  | LP Exp RP           %prec ELSE {$$ = Node3("Exp");}
+  | Exp MINUS Exp       {$$ = Node3("Exp");$$ -> func = binary_op_handler;}
+  | Exp STAR Exp        {$$ = Node3("Exp");$$ -> func = binary_op_handler;}
+  | Exp DIV Exp         {$$ = Node3("Exp");$$ -> func = binary_op_handler;}
+  | LP Exp RP %prec ELSE{$$ = Node3("Exp");$$ -> func = parentheses_handler;}
   | MINUS Exp %prec HIGHER_THAN_MINUS
-                        {$$ = Node2("Exp");}
-  | NOT Exp             {$$ = Node2("Exp");}
+                        {$$ = Node2("Exp");$$ -> func = uminus_handler;}
+  | NOT Exp             {$$ = Node2("Exp");$$ -> func = not_handler;}
   | ID LP Args RP       {$$ = Node4("Exp");$$ -> func = fun_call_handler;}
-  | ID LP error RP      {syntax_error(@3.first_line, "Expect expression before ')'.");}
   | ID LP RP            {$$ = Node3("Exp");$$ -> func = fun_call_handler;}
   | Exp LB Exp x_RB     {$$ = Node4("Exp");$$ -> func = array_access_handler;}
   | Exp DOT ID          {$$ = Node3("Exp");$$ -> func = struct_access_handler;}
   | ID                  {$$ = Node1("Exp");$$ -> func = id_handler;}
   | INT                 {$$ = Node1("Exp");$$ -> func = int_handler;}
   | FLOAT               {$$ = Node1("Exp");$$ -> func = float_handler;}
+  | ID LP error RP      {syntax_error(@3.first_line, "Expect expression before ')'.");}
   ;
 Bad_exp :
     Exp ASSIGNOP
