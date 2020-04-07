@@ -2,6 +2,7 @@
 #include <limits.h>
 #include "common.h"
 #include "table.h"
+#include "type.h"
 
 #define LEN 12
 #define SIZE (1<<LEN)
@@ -71,7 +72,6 @@ void free_scope() {
 }
 
 static int table_insert_real(const char* name, Type type, unsigned _depth) {
-    my_log("Inserting %s\n", name);
     int x = hash(name);
     tab* p = new(tab);
     p -> type = type;
@@ -84,23 +84,23 @@ static int table_insert_real(const char* name, Type type, unsigned _depth) {
     return 0;
 }
 
+static Type table_lookup_all(const char* name, int depth);
+
 int table_insert_struct(const char* name, Type type) {
     //name will not be copied
-    if(table_lookup(name)) return -1;
+    if(table_lookup_all(name, 0)) return -1;
     return table_insert_real(name, type, UINT_MAX);
 }
 
 int table_insert_global(const char* name, Type type) {
     //name will not be copied
-    if(table_lookup(name)) return -1;
+    if(table_lookup_all(name, 0)) return -1;
     return table_insert_real(name, type, 0);
 }
 
-static Type table_lookup_real(const char* name, int depth);
-
 int table_insert(const char* name, Type type) {
     //name will not be copied
-    if(table_lookup_real(name, depth)) return -1;
+    if(table_lookup_all(name, depth)) return -1;
     if(depth > 0) {
         struct LNode* tmp = new(struct LNode);
         tmp -> next = cur_list -> dec;
@@ -110,7 +110,7 @@ int table_insert(const char* name, Type type) {
     return table_insert_real(name, type, depth);
 }
 
-static Type table_lookup_real(const char* name, int depth) {
+static Type table_lookup_all(const char* name, int depth) {
     int x = hash(name);
     tab* ret = NULL;
     for(tab* p = table[x] -> next;p; p = p -> next) {
@@ -124,6 +124,27 @@ static Type table_lookup_real(const char* name, int depth) {
         return NULL;
     }
 }
+
+Type table_lookup_variable(const char* name, int depth) {
+    int x = hash(name);
+    tab* ret = NULL;
+    for(tab* p = table[x] -> next;p; p = p -> next) {
+        if(p -> depth >= depth && !strcmp(p -> name, name) && p -> type -> kind != STRUCTURE_DEF) {
+
+            ret = p;
+        }
+    }
+    if(ret) {
+        return ret -> type;
+    } else {
+        return NULL;
+    }
+}
+
 Type table_lookup(const char* name) {
-    return table_lookup_real(name, 0);
+    return table_lookup_variable(name, 0);
+}
+
+Type table_lookup_struct(const char* name) {
+    return table_lookup_all(name, 0);
 }

@@ -8,6 +8,7 @@ int table_insert_global(const char*,Type);
 int table_insert_struct(const char*,Type);
 int table_insert(const char*,Type);
 Type table_lookup(const char*);
+Type table_lookup_struct(const char*);
 
 void new_scope();
 void free_scope();

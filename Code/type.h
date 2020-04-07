@@ -18,6 +18,7 @@ struct Type_ {
             Type elem;
             int size;
         } array;
+        Type variable;
         struct {
             //function used this as well
             //return type -> arg1 -> arg2 -> ...

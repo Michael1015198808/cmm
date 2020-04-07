@@ -77,7 +77,7 @@ static int fieldcmp(FieldList f1, FieldList f2) {
 }
 
 int typecmp(Type t1, Type t2) {
-    if(t1 && t1) {
+    if(t1 && t2) {
         if(t1 -> kind != t2 -> kind) {
             return 1;
         }

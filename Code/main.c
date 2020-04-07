@@ -2,6 +2,7 @@
 #include "table.h"
 #include <assert.h>
 
+#include <mcheck.h>
 void preorder(node*);
 int error_cnt = 0;
 int yydebug = 1;
@@ -17,12 +18,14 @@ int main(int argc, char** argv) {
         syntax_error(yylineno, "End Of File unsupposed!");
     } else {
         if(!error_cnt) {
+            //mtrace();
             init_hash_table();
             preorder(root);
             void fun_dec_checker();
             fun_dec_checker();
             void free_tree(node* cur);
             free_tree(root);
+            //muntrace();
         }
     }
     return 0;
@@ -114,5 +117,7 @@ void free_tree(node* cur) {
         if(cur->siblings[i])
             free_tree(cur->siblings[i]);
     }
+    if(cur -> cnt > 0)
+        free(cur -> siblings);
     free(cur);
 }

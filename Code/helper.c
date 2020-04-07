@@ -92,7 +92,8 @@ make_handler(type) {
     }
 }
 
-static inline FieldList deflist_to_structure(node* cur) {
+static inline Type deflist_to_struct_type(node* cur) {
+    Type ret = new(struct Type_);
     struct FieldList_ guard;
     FieldList last = &guard;
     for(;cur && cur -> cnt == 2; cur = cur -> siblings[1]) {
@@ -120,7 +121,9 @@ static inline FieldList deflist_to_structure(node* cur) {
         }
     }
     last -> next = NULL;
-    return guard.next;
+    ret -> kind = STRUCTURE;
+    ret -> structure = guard.next;
+    return ret;
 }
 
 make_handler(struct_specifier) {
@@ -128,26 +131,26 @@ make_handler(struct_specifier) {
     Type ret = NULL;
     switch(cur -> cnt) {
         case 2:
-            ret = table_lookup(cur -> siblings[1] -> siblings[0] -> val_str);
+            ret = table_lookup_struct(cur -> siblings[1] -> siblings[0] -> val_str);
             if(!ret) {
                 semantic_error(cur -> lineno, UNDEFINE_STRUCTURE, cur -> siblings[1] -> siblings[0] -> val_str);
+            } else {
+                ret = ret -> variable;
             }
             break;
         case 5:
-            {
-                node* def_list = cur -> siblings[3];
-                ret = new(struct Type_);
-                ret -> kind = STRUCTURE;
-                new_scope();
-                ret -> structure = deflist_to_structure(def_list);
-                free_scope();
-                if(cur -> siblings[1]) {
-                    if(table_insert_struct(cur -> siblings[1] -> siblings[0] -> val_str, ret)) {
-                        semantic_error(cur -> lineno, DUPLICATE_NAME, cur -> siblings[1] -> siblings[0] -> val_str);
-                    }
+            ret = new(struct Type_);
+            ret -> kind = STRUCTURE_DEF;
+            new_scope();
+            ret -> variable = deflist_to_struct_type(cur -> siblings[3]);
+            free_scope();
+            if(cur -> siblings[1]) {
+                if(table_insert_struct(cur -> siblings[1] -> siblings[0] -> val_str, ret)) {
+                    semantic_error(cur -> lineno, DUPLICATE_NAME, cur -> siblings[1] -> siblings[0] -> val_str);
                 }
-                break;
             }
+            ret = ret -> variable;
+            break;
         default:
             panic();
     }
@@ -200,14 +203,12 @@ struct fun_dec_list {
 static struct fun_dec_list* head = NULL;
 
 void fun_dec_checker() {
-    for(struct fun_dec_list* cur = head; cur; ) {
+    for(struct fun_dec_list* cur = head; cur; cur = remove_access(cur, next)) {
         if(cur -> t -> is_dec) {
             semantic_error(cur -> lineno, DEC_UNDEFINE_FUNCTION, cur -> name);
         }
-        struct fun_dec_list* next = cur -> next;
-        free(cur);
-        cur = next;
     }
+    head = NULL;
 }
 
 make_handler(fun_dec) { // cur : ExtDef -> Specifier FunDec CompSt
