@@ -1,8 +1,8 @@
 %{
-    #include "common.h"
-    #include "handlers.h"
-    #include "type.h"
     #include "lex.yy.c"
+%}
+
+%{
 
     //#define Node0(name) Node(name, yylsp[0].first_line, 0)
     #define Node0(name) NULL
@@ -15,6 +15,7 @@
     #define Node7(name) Node(name, yylsp[-6].first_line, 7, yyvsp[-6], yyvsp[-5], yyvsp[-4], yyvsp[-3], yyvsp[-2], yyvsp[-1], yyvsp[0])
     int yyerror(char* msg) {}
     char* get_vardec_name();
+    node* root;
 %}
 
 %nonassoc LOWEST

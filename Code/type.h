@@ -1,14 +1,15 @@
 #ifndef __TYPE_H__
 #define __TYPE_H__
 
+#include "error.h"
+
 int strcmp(const char*, const char*);
 #define IS(unit) (!strcmp(cur -> name, unit))
 
 typedef struct Type_* Type;
 typedef struct FieldList_* FieldList;
 
-Type type_int;
-Type type_float;
+Type type_int, type_float;
 
 struct Type_ {
     enum {BASIC, ARRAY, STRUCTURE, STRUCTURE_DEF, FUNCTION, NOTYPE} kind;
@@ -37,7 +38,11 @@ struct FieldList_ {
 Type to_array(Type type, int size);
 Type to_struct(int cnt, ...);
 Type to_func(Type ret_val, int cnt, ...);
+
 int typecmp(Type t1, Type t2);
+Type type_check(Type lhs, Type rhs, Type ret, int lineno, semantic_errors err, ...);
+
 void type_print(Type t);
+void type_clear(Type t);
 
 #endif

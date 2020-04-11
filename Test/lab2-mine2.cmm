@@ -1,0 +1,10 @@
+int a, b, c;
+struct qwq {
+    int x;
+} d, e, f;
+
+int main(int q)
+{
+    int a;
+}
+

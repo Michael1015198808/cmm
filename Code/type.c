@@ -78,6 +78,9 @@ static int fieldcmp(FieldList f1, FieldList f2) {
 
 int typecmp(Type t1, Type t2) {
     if(t1 && t2) {
+        if(t1 == t2) {
+            return 0;
+        }
         if(t1 -> kind != t2 -> kind) {
             return 1;
         }
@@ -94,8 +97,22 @@ int typecmp(Type t1, Type t2) {
                 return 1;
         }
     } else {
-        return (t1 == NULL) ^ (t2 == NULL);
+        return (t1 != NULL) || (t2 != NULL);
     }
+}
+
+Type type_check(Type lhs, Type rhs, Type ret, int lineno, semantic_errors err, ...) {
+    va_list ap;
+    va_start(ap, err);
+
+    if(lhs && rhs) {
+        if(!typecmp(lhs, rhs)) {
+            if(ret) return ret;
+            else return lhs;
+        }
+        vsemantic_error(lineno, err, ap);
+    }
+    return NULL;
 }
 
 void static inline type_print_real(Type t, int indent) {
@@ -113,6 +130,8 @@ void static inline type_print_real(Type t, int indent) {
             type_print_real(t -> array.elem, indent);
             printf("[%d]", t -> array.size);
             break;
+        case STRUCTURE_DEF:
+            t = t -> variable;
         case STRUCTURE:
             printf("struct {\n");
             for(FieldList cur = t -> structure; cur; cur = cur -> next) {
@@ -145,37 +164,33 @@ void type_print(Type t) {
     putchar('\n');
 }
 
-int type_to_str(Type t, char* buf) {
-    int idx = 0;
+void type_clear(Type t);
+
+void field_clear(FieldList f) {
+    if(f) {
+        type_clear(f -> type);
+        field_clear(remove_access(f, next));
+    }
+}
+
+void type_clear(Type t) {
     switch(t -> kind) {
-        case BASIC:
-            if(t -> basic == T_INT) {
-                return sprintf(buf, "int");
-            } else if(t -> basic == T_FLOAT){
-                return sprintf(buf, "float");
-            } else {
-                panic();
-            }
-            break;
         case ARRAY:
-            panic();
+            type_clear(t -> array.elem);
             break;
-        case STRUCTURE:
-            panic();
+        case STRUCTURE_DEF:
+            if(!t -> is_dec)
+                field_clear(remove_access(t -> variable, structure));
             break;
         case FUNCTION:
-            idx += sprintf(buf + idx, "(");
-            for(FieldList cur = t -> structure -> next; cur; cur = cur -> next) {
-                idx += type_to_str(cur -> type, buf + idx);
-                if(cur -> next) {
-                    idx += sprintf(buf + idx, ", ");
-                }
-            }
-            idx += sprintf(buf + idx, ")");
+            field_clear(t -> structure);
             break;
+        case STRUCTURE:
+        case BASIC:
+            return;
         default:
             panic();
-            break;
+            return;
     }
-    return idx;
+    free(t);
 }

@@ -3,7 +3,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <stdarg.h>
 
 #define YYSTYPE node*
@@ -18,19 +17,9 @@ static inline void* free_first(void* ptr1, void* ptr2) {
 #define remove_access(vari, field) \
     free_first(vari, vari -> field)
 
-int lexical_error(int lineno, const char* fmt, ...);
-int syntax_error(int lineno, const char* fmt, ...);
-int semantic_error(int lineno, int errorno, ...);
-int vsemantic_error(int lineno, int errorno, va_list);
-
 extern FILE* yyin;
 int yylineno;
-int yylex();
 int yyparse();
-int yyerror(char* msg);
-
-int asprintf(char**, const char*, ...);
-int vasprintf(char**, const char*, va_list);
 
 typedef struct node node;
 typedef void*(*handler)(node*);
@@ -46,37 +35,33 @@ struct node {
         float val_float;
     };
 };
-#define foreach(name, init, next) \
-    for(node* name = cur -> siblings[init];;name = name -> siblings[next])
 
-node* root;
+extern node* root;
 
 static inline node* Node(const char* name,int lineno, int cnt, ...) {
     node* ret = (node*)malloc(sizeof(node));
-    ret->func = NULL;
-    ret->name = name;
-    ret->cnt = cnt;
-    ret->lineno = lineno;
-    ret->siblings = (node**)malloc(sizeof(void*) * cnt);
-    va_list ap;
-    va_start(ap, cnt);
-    for(int i = 0; i < cnt; ++i) {
-        ret -> siblings[i] = va_arg(ap, node*);
+    ret -> func = NULL;
+    ret -> name = name;
+    ret -> cnt = cnt;
+    ret -> lineno = lineno;
+    if(cnt) {
+        ret -> siblings = (node**)malloc(sizeof(void*) * cnt);
+        va_list ap;
+        va_start(ap, cnt);
+        for(int i = 0; i < cnt; ++i) {
+            ret -> siblings[i] = va_arg(ap, node*);
+        }
+        va_end(ap);
+    } else {
+        ret -> siblings = NULL;
     }
-    va_end(ap);
     return ret;
 }
 
-static inline node* Singleton(const char* fmt, ...) {
-    char* buf;
-    va_list ap;
-    va_start(ap, fmt);
-    vasprintf(&buf, fmt, ap);
+static inline node* Singleton(const char* name) {
     extern int yylineno;
-    return Node(buf, yylineno, 0);
+    return Node(name, yylineno, 0);
 }
-
-void preorder(node* cur);
 
 #define TODO() \
     do { \
@@ -93,4 +78,4 @@ void preorder(node* cur);
         printf("%s: %d not implemented\n", __FILE__, __LINE__); \
     } while(0)
 
-#endif
+#endif // __COMMON_H__

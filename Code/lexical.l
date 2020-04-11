@@ -1,6 +1,9 @@
 %{
+    #include "common.h"
+    #include "error.h"
     #include "syntax.tab.h"
     #include "handlers.h"
+    #include "type.h"
     int yycolumn = 1;
     #define TOKEN(name)\
     do{ \
@@ -54,13 +57,11 @@ float_exp [Ee][\+\-]?{digit}+
 "!"         {TOKEN(NOT);}
 "int" {
     yylval = Singleton("TYPE");
-    yylval -> func = type_printer;
     yylval -> val_int = T_INT;
     return TYPE;
 }
 "float" {
     yylval = Singleton("TYPE");
-    yylval -> func = type_printer;
     yylval -> val_int = T_FLOAT;
     return TYPE;
 }
@@ -81,28 +82,24 @@ float_exp [Ee][\+\-]?{digit}+
 {digit}+\.{digit}+{float_exp}? {
     yylval = Singleton("FLOAT");
     yylval -> val_float = strtof(yytext, NULL);
-    yylval -> func = float_printer;
     return FLOAT;
 }
 
 (({digit}+\.{digit}*)|(\.{digit}+)){float_exp} {
     yylval = Singleton("FLOAT");
     yylval -> val_float = strtof(yytext, NULL);
-    yylval -> func = float_printer;
     return FLOAT;
 }
 
 {demi_num}|{oct_num}|{hex_num} {
     yylval = Singleton("INT");
     yylval -> val_int = strtol(yytext, NULL, 0);
-    yylval -> func = int_printer;
     return INT;
 }
 
 {letter_}({letter_}|{digit})* {
     yylval = Singleton("ID");
-    asprintf((char**)&yylval -> val_str, "%s", yytext);
-    yylval -> func = id_printer;
+    yylval -> val_str = strdup(yytext);
     return ID;
 }
 

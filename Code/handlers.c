@@ -1,17 +1,19 @@
 #include "common.h"
+#include "type.h"
 #include "error.h"
 #include "handlers.h"
 #include "table.h"
 
-Type type_check(Type lhs, Type rhs, Type ret, int lineno, semantic_errors err, ...) {
-    va_list ap;
-    va_start(ap, err);
-
-    if(lhs && rhs && typecmp(lhs, rhs)) {
-        vsemantic_error(lineno, err, ap);
+make_handler(semantic) { // Most top-level handler. Default handler
+    if(cur -> func) {
+        return cur -> func(cur);
+    } else {
+        for(int i = 0; i < cur->cnt; ++i) {
+            if(cur->siblings[i])
+                semantic_handler(cur->siblings[i]);
+        }
+        return NULL;
     }
-    if(ret) return ret;
-    else return lhs;
 }
 
 char* get_vardec_name(node* cur) {
@@ -26,10 +28,20 @@ make_handler(def) {
     Type old_def_type = cur_def_type;
     cur_def_type = cur -> siblings[0] -> func(cur -> siblings[0]);
     if(cur -> cnt == 3) {
-        preorder(cur -> siblings[1]);
+        semantic_handler(cur -> siblings[1]);
     }
     cur_def_type = old_def_type;
     return NULL;
+}
+
+make_handler(variable) {// cur : VarDec -> ID
+    return cur_def_type;
+}
+
+make_handler(array_dec) {// cur : VarDec -> VarDec LB INT RB
+    node* vardec = cur -> siblings[0];
+    Type t = vardec -> func(vardec);
+    return to_array(t, cur -> siblings[2] -> val_int);
 }
 
 make_handler(extdeclist) {
@@ -40,9 +52,10 @@ make_handler(extdeclist) {
     }
     return cur -> siblings[2] -> func(cur -> siblings[2]);
 }
+
 make_handler(vardec) {// cur : Dec -> VarDec
-                    // cur : ExtDecList -> VarDec
-                    // cur : Dec -> VarDec ASSIGNOP Exp
+                      // cur : ExtDecList -> VarDec
+                      // cur : Dec -> VarDec ASSIGNOP Exp
     node* vardec = cur -> siblings[0];
     const char* const name = get_vardec_name(vardec);
     Type t = vardec -> func(vardec);
@@ -55,30 +68,6 @@ make_handler(vardec) {// cur : Dec -> VarDec
     }
     return NULL;
 }
-
-make_handler(array_dec) {// cur : VarDec -> VarDec LB INT RB
-    node* vardec = cur -> siblings[0];
-    Type t = vardec -> func(vardec);
-    return to_array(t, cur -> siblings[2] -> val_int);
-}
-
-make_handler(variable) {// cur : VarDec -> ID
-    return cur_def_type;
-}
-/*
-make_handler(deflist) {
-        cur = cur -> siblings[1];
-        while(cur -> cnt == 3) {
-            if(table_insert(get_vardec_name(cur -> siblings[0]), t)) {
-                semantic_error(cur -> lineno, REDEFINE_VARIABLE, get_vardec_name(cur -> siblings[0]));
-            };
-            cur = cur -> siblings[2];
-        }
-        if(table_insert(get_vardec_name(cur -> siblings[0]), t)) {
-            semantic_error(cur -> lineno, REDEFINE_VARIABLE, get_vardec_name(cur -> siblings[0]));
-        }
-}
-*/
 
 make_handler(type) {
     switch(cur -> siblings[0] -> val_int) {
@@ -148,6 +137,8 @@ make_handler(struct_specifier) {
                 if(table_insert_struct(cur -> siblings[1] -> siblings[0] -> val_str, ret)) {
                     semantic_error(cur -> lineno, DUPLICATE_NAME, cur -> siblings[1] -> siblings[0] -> val_str);
                 }
+            } else {
+                add_anonymous_struct(ret);
             }
             ret = ret -> variable;
             break;
@@ -157,12 +148,6 @@ make_handler(struct_specifier) {
     return ret;
 }
 
-make_handler(def_list) {
-    panic();
-    return NULL;
-}
-
-static Type cur_fun_ret_type = NULL;
 
 static Type fun_parsing(node* cur, int is_dec) {
     Type ret = new(struct Type_);
@@ -234,6 +219,7 @@ make_handler(fun_dec) { // cur : ExtDef -> Specifier FunDec CompSt
 }
 
 static void* compst_without_scope(node* );
+static Type cur_fun_ret_type = NULL;
 make_handler(fun_def) { // cur : ExtDef -> Specifier FunDec CompSt
     new_scope();
     Type t = fun_parsing(cur, 0);
@@ -256,7 +242,10 @@ make_handler(fun_def) { // cur : ExtDef -> Specifier FunDec CompSt
     return NULL;
 }
 
-make_handler(null) {
+make_handler(return) {// cur : RETURN Exp SEMI
+    Assert(cur_fun_ret_type);
+    node* exp = cur -> siblings[1];
+    type_check(cur_fun_ret_type, exp -> func(exp), NULL, exp -> lineno, RETURN_MISMATCH);
     return NULL;
 }
 
@@ -337,32 +326,10 @@ make_handler(fun_call) {// cur : ID LP Args RP
             }
         }
         if(param || args) {
-            /*
-            char buf1[100], buf2[100];
-            type_to_str(func, buf1);
-            int idx = 0;
-            idx += sprintf(buf2 + idx, "(");
-            for(args = cur -> siblings[2]; ;args = args -> siblings[2]) {
-                node* exp = args -> siblings[0];
-                Type t = exp -> func(exp);
-                if(t -> basic == T_INT) {
-                    idx += sprintf(buf2 + idx, "int");
-                } else {
-                    idx += sprintf(buf2 + idx, "float");
-                }
-                if(args -> cnt == 1) break;
-                else idx += sprintf(buf2 + idx, ", ");
-            }
-            idx += sprintf(buf2 + idx, ")");
-            */
             semantic_error(fun -> lineno, FUNCTION_MISMATCH, fun -> val_str);
         }
     } else {
         if(func -> structure -> next) {
-            /*
-            char buf[100];
-            type_to_str(func, buf);
-            */
             semantic_error(fun -> lineno, FUNCTION_MISMATCH, fun -> val_str);
         }
     }
@@ -379,13 +346,6 @@ make_handler(array_access) {// cur : Exp LB Exp RB
     node* exp2 = cur -> siblings[2];
     Type index = exp2 -> func(exp2);
     return type_check(type_int, index, base -> array.elem, exp2 -> lineno, NOT_INT);
-}
-
-make_handler(return) {// cur : RETURN Exp SEMI
-    Assert(cur_fun_ret_type);
-    node* exp = cur -> siblings[1];
-    type_check(cur_fun_ret_type, exp -> func(exp), NULL, exp -> lineno, RETURN_MISMATCH);
-    return NULL;
 }
 
 make_handler(struct_access) {// cur : Exp DOT ID
@@ -408,9 +368,9 @@ make_handler(struct_access) {// cur : Exp DOT ID
 
 static void* compst_without_scope(node* cur) {
     if(cur -> siblings[1])
-        preorder(cur -> siblings[1]);
+        semantic_handler(cur -> siblings[1]);
     if(cur -> siblings[2])
-        preorder(cur -> siblings[2]);
+        semantic_handler(cur -> siblings[2]);
     return NULL;
 }
 
@@ -454,15 +414,15 @@ make_handler(if) { // cur : Stmt -> IF LP Exp RP Stmt
                     //cur : Stmt -> IF LP Exp RP Stmt ELSE Stmt
     node* exp = cur -> siblings[2];
     type_check(exp -> func(exp), type_int, NULL, exp -> lineno, OPERAND_MISMATCH);
-    preorder(cur -> siblings[4]);
+    semantic_handler(cur -> siblings[4]);
     if(cur -> cnt == 7)
-        preorder(cur -> siblings[6]);
+        semantic_handler(cur -> siblings[6]);
     return NULL;
 }
 
 make_handler(while) { // cur : Stmt -> WHILE LP Exp RP Stmt
     node* exp = cur -> siblings[2];
     type_check(exp -> func(exp), type_int, NULL, exp -> lineno, OPERAND_MISMATCH);
-    preorder(cur -> siblings[4]);
+    semantic_handler(cur -> siblings[4]);
     return NULL;
 }

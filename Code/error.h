@@ -1,6 +1,13 @@
 #ifndef __ERROR_H__
 #define __ERROR_H__
 
+#include <stdarg.h>
+
+int lexical_error(int lineno, const char* fmt, ...);
+int syntax_error(int lineno, const char* fmt, ...);
+int semantic_error(int lineno, int errorno, ...);
+int vsemantic_error(int lineno, int errorno, va_list);
+
 typedef enum {
     UNDEFINE_VARIABLE = 1,
     UNDEFINE_FUNCTION = 2,
@@ -23,4 +30,4 @@ DEC_UNDEFINE_FUNCTION = 18,
     INCONSIS_DEC      = 19,
 } semantic_errors;
 
-#endif //__ERROR_H__
+#endif // __ERROR_H__

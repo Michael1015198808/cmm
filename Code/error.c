@@ -1,6 +1,6 @@
 #include "common.h"
 #include "error.h"
-int error_cnt;
+extern int error_cnt;
 
 int lexical_error(int lineno, const char* fmt, ...) {
     ++error_cnt;
@@ -55,6 +55,7 @@ int vsemantic_error(int lineno, int errorno, va_list ap) {
     ret +=  vprintf(semantic_errors_msg[errorno], ap);
     return ret;
 }
+
 int semantic_error(int lineno, int errorno, ...) {
     va_list ap;
     va_start(ap, errorno);

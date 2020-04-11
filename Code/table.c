@@ -4,24 +4,24 @@
 #include "table.h"
 #include "type.h"
 
-#define LEN 12
+#define LEN 14
 #define SIZE (1<<LEN)
 
 typedef struct tab tab;
 struct tab{
-    enum {TYPE, VARI} kind;
     Type type;
     const char* name;
     tab* next;
     unsigned depth;
 };
-static int depth = 0;
+static unsigned depth;
 
 static tab* table[SIZE] = {};
 static tab* table_tail[SIZE] = {};
 
 void init_hash_table() {
     static tab sentries[SIZE];
+    depth = 0;
     for(int i = 0; i < SIZE; ++i) {
         table[i] = table_tail[i] = &(sentries[i]);
     }
@@ -87,19 +87,16 @@ static int table_insert_real(const char* name, Type type, unsigned _depth) {
 static Type table_lookup_all(const char* name, int depth);
 
 int table_insert_struct(const char* name, Type type) {
-    //name will not be copied
     if(table_lookup_all(name, 0)) return -1;
     return table_insert_real(name, type, UINT_MAX);
 }
 
 int table_insert_global(const char* name, Type type) {
-    //name will not be copied
     if(table_lookup_all(name, 0)) return -1;
     return table_insert_real(name, type, 0);
 }
 
 int table_insert(const char* name, Type type) {
-    //name will not be copied
     if(table_lookup_all(name, depth)) return -1;
     if(depth > 0) {
         struct LNode* tmp = new(struct LNode);
@@ -130,7 +127,6 @@ Type table_lookup_variable(const char* name, int depth) {
     tab* ret = NULL;
     for(tab* p = table[x] -> next;p; p = p -> next) {
         if(p -> depth >= depth && !strcmp(p -> name, name) && p -> type -> kind != STRUCTURE_DEF) {
-
             ret = p;
         }
     }
@@ -147,4 +143,51 @@ Type table_lookup(const char* name) {
 
 Type table_lookup_struct(const char* name) {
     return table_lookup_all(name, 0);
+}
+
+void type_clear(Type);
+
+void table_print() {
+    for(int i = 0; i < SIZE; ++i) {
+        if(table[i] != table_tail[i]) {
+            for(tab* cur = table[i] -> next; ; cur = cur -> next) {
+                printf("\n%s(%d): ", cur -> name, cur -> depth);
+                type_print(cur -> type);
+                if(cur == table_tail[i]) {
+                    break;
+                }
+            }
+        }
+    }
+}
+void table_clear() {
+    for(int i = 0; i < SIZE; ++i) {
+        if(table[i] != table_tail[i]) {
+            for(tab* cur = table[i] -> next; ; cur = remove_access(cur, next)) {
+                type_clear(cur -> type);
+                if(cur == table_tail[i]) {
+                    free(cur);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+static struct struct_dec_list {
+    Type type;
+    struct struct_dec_list* next;
+} *struct_dec_list_head = NULL;
+
+void add_anonymous_struct(Type ret) {
+    struct struct_dec_list* tmp = new(struct struct_dec_list);
+    tmp -> type = ret;
+    tmp -> next = struct_dec_list_head;
+    struct_dec_list_head = tmp;
+}
+
+void remove_anonymous_struct() {
+    for(struct struct_dec_list* cur = struct_dec_list_head; cur; cur = remove_access(cur, next)) {
+        type_clear(cur -> type);
+    }
 }
