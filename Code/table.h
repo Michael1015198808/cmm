@@ -16,6 +16,7 @@ void table_clear();
 
 void new_scope();
 void free_scope();
+void struct_free_scope();
 
 void add_anonymous_struct(Type ret);
 void remove_anonymous_struct();

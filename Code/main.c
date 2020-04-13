@@ -17,8 +17,6 @@ int main(int argc, char** argv) {
             perror(argv[1]);
             return 1;
         }
-    } else {
-        yyin = fopen("/home/michael/compilers-tests/tests/m3.cmm", "r");
     }
     error_cnt = 0;
     if(yyparse()) {

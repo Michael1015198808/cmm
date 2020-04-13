@@ -59,16 +59,24 @@ void new_scope() {
     ++depth;
 }
 
-void free_scope() {
+static inline void free_scope_real(int to_free) {
     for(struct LNode* cur = cur_list -> dec; cur; cur = remove_access(cur, next)) {
         tab* to_rm = cur -> pre -> next;
         if(to_rm -> next == NULL) {
             table_tail[hash(to_rm -> name)] = cur -> pre;
         }
+        if(to_free && cur -> pre -> next -> type)
+            type_clear(cur -> pre -> next -> type);
         cur -> pre -> next = remove_access(to_rm, next);
     }
     cur_list = remove_access(cur_list, pre);
     --depth;
+}
+void struct_free_scope() {
+    free_scope_real(0);
+}
+void free_scope() {
+    free_scope_real(1);
 }
 
 static int table_insert_real(const char* name, Type type, unsigned _depth) {

@@ -2,7 +2,7 @@
 #include "table.h"
 #include "type.h"
 
-static struct Type_ type_int_ = {
+const static struct Type_ type_int_ = {
     .kind = BASIC,
     .basic = T_INT
 }, type_float_ = {
@@ -10,13 +10,13 @@ static struct Type_ type_int_ = {
     .basic = T_FLOAT
 };
 
-Type type_int = &type_int_;
-Type type_float = &type_float_;
+CType type_int = &type_int_;
+CType type_float = &type_float_;
 
-Type to_array(Type base, int size) {
+Type to_array(CType base, int size) {
     Type ret = new(struct Type_);
     ret -> kind = ARRAY;
-    ret -> array.elem = base;
+    ret -> array.elem = (Type)base;
     ret -> array.size = size;
     return ret;
 }
@@ -45,12 +45,12 @@ Type to_struct(int cnt, ...) {
     return ret;
 }
 
-Type to_func(Type ret_val, int cnt, ...) {
+Type to_func(CType ret_val, int cnt, ...) {
     Type ret = new(struct Type_);
     ret -> kind = FUNCTION;
     ret -> structure = new(struct FieldList_);
     ret -> structure -> name = "";
-    ret -> structure -> type = ret_val;
+    ret -> structure -> type = (Type)ret_val;
 
     FieldList last = ret -> structure;
     va_list ap;
@@ -76,7 +76,38 @@ static int fieldcmp(FieldList f1, FieldList f2) {
     }
 }
 
-int typecmp(Type t1, Type t2) {
+Type typecpy(CType t) {
+    switch(t -> kind) {
+        case BASIC:
+            return (Type)t;
+        case ARRAY:
+            return to_array(typecpy(t -> array.elem), t -> array.size);
+        case STRUCTURE:
+        case FUNCTION:
+            {
+                Type ret = new(struct Type_);
+                ret -> kind = t -> kind;
+                struct FieldList_ senti;
+                for(FieldList src = t -> structure, des = &senti;; src = src -> next) {
+                    if(!src) {
+                        des -> next = NULL;
+                        break;
+                    }
+                    des -> next = new(struct FieldList_);
+                    des = des -> next;
+                    des -> name = src -> name;
+                    des -> type = typecpy(src -> type);
+                }
+                ret -> structure = senti.next;
+                return ret;
+            }
+        default:
+            panic();
+    }
+    panic();
+    return NULL;
+}
+int typecmp(CType t1, CType t2) {
     if(t1 && t2) {
         if(t1 == t2) {
             return 0;
@@ -101,14 +132,14 @@ int typecmp(Type t1, Type t2) {
     }
 }
 
-Type type_check(Type lhs, Type rhs, Type ret, int lineno, semantic_errors err, ...) {
+Type type_check(CType lhs, CType rhs, CType ret, int lineno, semantic_errors err, ...) {
     va_list ap;
     va_start(ap, err);
 
     if(lhs && rhs) {
         if(!typecmp(lhs, rhs)) {
-            if(ret) return ret;
-            else return lhs;
+            if(ret) return (Type)ret;
+            else return (Type)lhs;
         }
         vsemantic_error(lineno, err, ap);
     }

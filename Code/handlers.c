@@ -59,12 +59,14 @@ make_handler(vardec) {// cur : Dec -> VarDec
     node* vardec = cur -> siblings[0];
     const char* const name = get_vardec_name(vardec);
     Type t = vardec -> func(vardec);
-    if(table_insert(name, t)) {
-        semantic_error(cur -> lineno, REDEFINE_VARIABLE, name);
-    }
-    if(cur -> cnt == 3) {
-        node* exp = cur -> siblings[2];
-        type_check(t, exp -> func(exp), NULL, exp -> lineno, ASSIGN_MISMATCH);
+    if(t) {
+        if(table_insert(name, t)) {
+            semantic_error(cur -> lineno, REDEFINE_VARIABLE, name);
+        }
+        if(cur -> cnt == 3) {
+            node* exp = cur -> siblings[2];
+            type_check(t, exp -> func(exp), NULL, exp -> lineno, ASSIGN_MISMATCH);
+        }
     }
     return NULL;
 }
@@ -72,9 +74,9 @@ make_handler(vardec) {// cur : Dec -> VarDec
 make_handler(type) {
     switch(cur -> siblings[0] -> val_int) {
         case T_FLOAT:
-            return type_float;
+            return (void*)type_float;
         case T_INT:
-            return type_int;
+            return (void*)type_int;
         default:
             panic();
             return NULL;
@@ -132,7 +134,7 @@ make_handler(struct_specifier) {
             ret -> kind = STRUCTURE_DEF;
             new_scope();
             ret -> variable = deflist_to_struct_type(cur -> siblings[3]);
-            free_scope();
+            struct_free_scope();
             if(cur -> siblings[1]) {
                 if(table_insert_struct(cur -> siblings[1] -> siblings[0] -> val_str, ret)) {
                     semantic_error(cur -> lineno, DUPLICATE_NAME, cur -> siblings[1] -> siblings[0] -> val_str);
@@ -167,7 +169,8 @@ static Type fun_parsing(node* cur, int is_dec) {
             last = last -> next;
             last -> name = get_vardec_name(paramdec -> siblings[1]);
             last -> type = paramdec -> siblings[1] -> func(paramdec -> siblings[1]);
-            if(table_insert(last -> name, last -> type)) {
+            Type t = paramdec -> siblings[1] -> func(paramdec -> siblings[1]);
+            if(table_insert(last -> name, t)) {
                 semantic_error(paramdec -> lineno, REDEFINE_VARIABLE, last -> name);
             };
             if(varlist -> cnt == 1) {
@@ -288,11 +291,11 @@ make_handler(binary_op) {
 }
 
 make_handler(int) {
-    return type_int;
+    return (void*)type_int;
 }
 
 make_handler(float) {
-    return type_float;
+    return (void*)type_float;
 }
 
 make_handler(fun_call) {// cur : ID LP Args RP 

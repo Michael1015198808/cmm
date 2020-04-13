@@ -7,9 +7,10 @@ int strcmp(const char*, const char*);
 #define IS(unit) (!strcmp(cur -> name, unit))
 
 typedef struct Type_* Type;
+typedef const struct Type_ * const CType;
 typedef struct FieldList_* FieldList;
 
-Type type_int, type_float;
+extern CType type_int, type_float;
 
 struct Type_ {
     enum {BASIC, ARRAY, STRUCTURE, STRUCTURE_DEF, FUNCTION, NOTYPE} kind;
@@ -35,12 +36,12 @@ struct FieldList_ {
     FieldList next;
 };
 
-Type to_array(Type type, int size);
+Type to_array(CType type, int size);
 Type to_struct(int cnt, ...);
-Type to_func(Type ret_val, int cnt, ...);
+Type to_func(CType ret_val, int cnt, ...);
 
-int typecmp(Type t1, Type t2);
-Type type_check(Type lhs, Type rhs, Type ret, int lineno, semantic_errors err, ...);
+int typecmp(CType t1, CType t2);
+Type type_check(CType lhs, CType rhs, CType ret, int lineno, semantic_errors err, ...);
 
 void type_print(Type t);
 void type_clear(Type t);
