@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include "ir.h"
 
 #define YYSTYPE node*
 
@@ -22,7 +23,7 @@ int yylineno;
 int yyparse();
 
 typedef struct node node;
-typedef void*(*handler)(node*);
+typedef void*(*handler)(node*, operand);
 
 struct node {
     handler func;

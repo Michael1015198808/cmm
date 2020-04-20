@@ -51,6 +51,7 @@ static char* semantic_errors_msg[] = {
 
 int vsemantic_error(int lineno, int errorno, va_list ap) {
     int ret = 0;
+    ++error_cnt;
     ret += printf("Error type %d at Line %d: ", errorno, lineno);
     ret +=  vprintf(semantic_errors_msg[errorno], ap);
     return ret;

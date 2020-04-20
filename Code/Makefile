@@ -76,4 +76,4 @@ runall: parser $(TEST_OUT)
 		cat $$case.out; \
 	done;
 run: parser
-	@./parser ../Test/temp.cmm
+	@./parser ../Test/lab3-mine1.cmm

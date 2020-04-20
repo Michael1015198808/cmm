@@ -25,6 +25,8 @@ void init_hash_table() {
     for(int i = 0; i < SIZE; ++i) {
         table[i] = table_tail[i] = &(sentries[i]);
     }
+    table_insert("read", to_func(type_int, 0));
+    table_insert("write", to_func(type_int, 1, "", type_int));
 }
 
 int hash(const char* name) {

@@ -4,9 +4,9 @@
 #include "handlers.h"
 #include "table.h"
 
-make_handler(semantic) { // Most top-level handler. Default handler
+void* semantic_handler(node* cur) { // Most top-level handler. Default handler
     if(cur -> func) {
-        return cur -> func(cur);
+        return cur -> func(cur, NULL);
     } else {
         for(int i = 0; i < cur->cnt; ++i) {
             if(cur->siblings[i])
@@ -26,7 +26,7 @@ char* get_vardec_name(node* cur) {
 Type cur_def_type = NULL;
 make_handler(def) {
     Type old_def_type = cur_def_type;
-    cur_def_type = cur -> siblings[0] -> func(cur -> siblings[0]);
+    cur_def_type = semantic_handler(cur -> siblings[0]);
     if(cur -> cnt == 3) {
         semantic_handler(cur -> siblings[1]);
     }
@@ -40,17 +40,17 @@ make_handler(variable) {// cur : VarDec -> ID
 
 make_handler(array_dec) {// cur : VarDec -> VarDec LB INT RB
     node* vardec = cur -> siblings[0];
-    Type t = vardec -> func(vardec);
+    Type t = semantic_handler(vardec);
     return to_array(t, cur -> siblings[2] -> val_int);
 }
 
 make_handler(extdeclist) {
     node* vardec = cur -> siblings[0];
     const char* const name = get_vardec_name(vardec);
-    if(table_insert(name, vardec -> func(vardec))) {
+    if(table_insert(name, semantic_handler(vardec))) {
         semantic_error(cur -> lineno, REDEFINE_VARIABLE, name);
     }
-    return cur -> siblings[2] -> func(cur -> siblings[2]);
+    return semantic_handler(cur -> siblings[2]);
 }
 
 make_handler(vardec) {// cur : Dec -> VarDec
@@ -58,14 +58,14 @@ make_handler(vardec) {// cur : Dec -> VarDec
                       // cur : Dec -> VarDec ASSIGNOP Exp
     node* vardec = cur -> siblings[0];
     const char* const name = get_vardec_name(vardec);
-    Type t = vardec -> func(vardec);
+    Type t = semantic_handler(vardec);
     if(t) {
         if(table_insert(name, t)) {
             semantic_error(cur -> lineno, REDEFINE_VARIABLE, name);
         }
         if(cur -> cnt == 3) {
             node* exp = cur -> siblings[2];
-            type_check(t, exp -> func(exp), NULL, exp -> lineno, ASSIGN_MISMATCH);
+            type_check(t, semantic_handler(exp), NULL, exp -> lineno, ASSIGN_MISMATCH);
         }
     }
     return NULL;
@@ -90,13 +90,13 @@ static inline Type deflist_to_struct_type(node* cur) {
     for(;cur && cur -> cnt == 2; cur = cur -> siblings[1]) {
         node* def = cur -> siblings[0];
         node* specifier = def -> siblings[0];
-        Type t = specifier -> func(specifier);
+        Type t = semantic_handler(specifier);
         for(node* declist = def -> siblings[1];;) {
             node* vardec = declist -> siblings[0] -> siblings[0];
             last -> next = new(struct FieldList_);
             last = last -> next;
             cur_def_type = t;
-            last -> type = vardec -> func(vardec);
+            last -> type = semantic_handler(vardec);
             last -> name = get_vardec_name(vardec);
             if(declist -> siblings[0] -> cnt == 3) {
                 semantic_error(vardec -> siblings[0] -> lineno, REDEFINE_FIELD, last -> name);
@@ -157,19 +157,19 @@ static Type fun_parsing(node* cur, int is_dec) {
     ret -> is_dec = is_dec;
     ret -> structure = new(struct FieldList_);
     ret -> structure -> name = "";
-    ret -> structure -> type = cur -> siblings[0] -> func(cur -> siblings[0]);
+    ret -> structure -> type = semantic_handler(cur -> siblings[0]);
 
     FieldList last = ret -> structure;
     if(cur -> siblings[1] -> cnt == 4) {
         for(node* varlist = cur -> siblings[1] -> siblings[2]; ;varlist = varlist -> siblings[2]) {
             node* paramdec = varlist -> siblings[0];
-            cur_def_type = paramdec -> siblings[0] -> func(paramdec -> siblings[0]);
+            cur_def_type = semantic_handler(paramdec -> siblings[0]);
 
             last -> next = new(struct FieldList_);
             last = last -> next;
             last -> name = get_vardec_name(paramdec -> siblings[1]);
-            last -> type = paramdec -> siblings[1] -> func(paramdec -> siblings[1]);
-            Type t = paramdec -> siblings[1] -> func(paramdec -> siblings[1]);
+            last -> type = semantic_handler(paramdec -> siblings[1]);
+            Type t = semantic_handler(paramdec -> siblings[1]);
             if(table_insert(last -> name, t)) {
                 semantic_error(paramdec -> lineno, REDEFINE_VARIABLE, last -> name);
             };
@@ -248,7 +248,7 @@ make_handler(fun_def) { // cur : ExtDef -> Specifier FunDec CompSt
 make_handler(return) {// cur : RETURN Exp SEMI
     Assert(cur_fun_ret_type);
     node* exp = cur -> siblings[1];
-    type_check(cur_fun_ret_type, exp -> func(exp), NULL, exp -> lineno, RETURN_MISMATCH);
+    type_check(cur_fun_ret_type, semantic_handler(exp), NULL, exp -> lineno, RETURN_MISMATCH);
     return NULL;
 }
 
@@ -267,8 +267,8 @@ int is_lvalue(node* cur) {
 }
 
 make_handler(assign) { //cur : Exp ASSIGNOP Exp
-    Type lhs = cur -> siblings[0] -> func(cur -> siblings[0]);
-    Type rhs = cur -> siblings[2] -> func(cur -> siblings[2]);
+    Type lhs = semantic_handler(cur -> siblings[0]);
+    Type rhs = semantic_handler(cur -> siblings[2]);
     if(!is_lvalue(cur -> siblings[0])) {
         semantic_error(cur -> siblings[0] -> lineno, LVALUE);
     }
@@ -281,16 +281,33 @@ make_handler(id) { //cur : ID
     if(!t) {
         semantic_error(cur -> lineno, UNDEFINE_VARIABLE, cur -> val_str);
     }
+    if(res) {
+        res -> kind = VARIABLE;
+        res -> val_str = cur -> val_str;
+    }
     return t;
 }
 
 make_handler(binary_op) {
-    Type lhs = cur -> siblings[0] -> func(cur -> siblings[0]);
-    Type rhs = cur -> siblings[2] -> func(cur -> siblings[2]);
+    operand op1, op2;
+    Type lhs = cur -> siblings[0] -> func(cur -> siblings[0], op1 = new_temp_operand());
+    Type rhs = cur -> siblings[2] -> func(cur -> siblings[2], op2 = new_temp_operand());
+    ir* cur_ir = new(ir);
+    *cur_ir = (ir){
+        .kind = ADD,
+        .op1 = op1,
+        .op2 = op2,
+        .res = res,
+    };
+    add_ir(cur_ir);
     return type_check(lhs, rhs, NULL, cur -> siblings[0] -> lineno, OPERAND_MISMATCH);
 }
 
 make_handler(int) {
+    if(res) {
+        res -> kind = CONSTANT;
+        res -> val_int = cur -> siblings[0] -> val_int;
+    }
     return (void*)type_int;
 }
 
@@ -316,7 +333,7 @@ make_handler(fun_call) {// cur : ID LP Args RP
         node* args = cur -> siblings[2];
         for(; param;) {
             node* exp = args -> siblings[0];
-            Type t = exp -> func(exp);
+            Type t = semantic_handler(exp);
             if(typecmp(t, param -> type)) {
                 break;
             }
@@ -341,19 +358,19 @@ make_handler(fun_call) {// cur : ID LP Args RP
 
 make_handler(array_access) {// cur : Exp LB Exp RB
     node* exp1 = cur -> siblings[0];
-    Type base = exp1 -> func(exp1);
+    Type base = semantic_handler(exp1);
     if(base -> kind != ARRAY) {
         semantic_error(exp1 -> lineno, NOT_ARRAY);
         return NULL;
     }
     node* exp2 = cur -> siblings[2];
-    Type index = exp2 -> func(exp2);
+    Type index = semantic_handler(exp2);
     return type_check(type_int, index, base -> array.elem, exp2 -> lineno, NOT_INT);
 }
 
 make_handler(struct_access) {// cur : Exp DOT ID
     node* exp = cur -> siblings[0];
-    Type t = exp -> func(exp);
+    Type t = semantic_handler(exp);
     if(t) {
         if(t -> kind != STRUCTURE) {
             semantic_error(exp -> lineno, ILLEGAL_USE, ".");
@@ -385,38 +402,38 @@ make_handler(compst) {
 }
 
 make_handler(logic) { //cur : Exp -> Exp AND Exp
-    Type lhs = cur -> siblings[0] -> func(cur -> siblings[0]);
-    Type rhs = cur -> siblings[2] -> func(cur -> siblings[2]);
+    Type lhs = semantic_handler(cur -> siblings[0]);
+    Type rhs = semantic_handler(cur -> siblings[2]);
     if(type_check(lhs, type_int, NULL, cur -> siblings[0] -> lineno, OPERAND_MISMATCH))
         return type_check(rhs, type_int, NULL, cur -> siblings[0] -> lineno, OPERAND_MISMATCH);
     return NULL;
 }
 
 make_handler(relop) {
-    Type lhs = cur -> siblings[0] -> func(cur -> siblings[0]);
-    Type rhs = cur -> siblings[2] -> func(cur -> siblings[2]);
+    Type lhs = semantic_handler(cur -> siblings[0]);
+    Type rhs = semantic_handler(cur -> siblings[2]);
     return type_check(lhs, rhs, type_int, cur -> siblings[0] -> lineno, OPERAND_MISMATCH);
 }
 
 make_handler(parentheses) { // cur : Exp -> LP Exp RP
     node* exp = cur -> siblings[1];
-    return exp -> func(exp);
+    return semantic_handler(exp);
 }
 
 make_handler(uminus) {
     node* exp = cur -> siblings[1];
-    return exp -> func(exp);
+    return semantic_handler(exp);
 }
 
 make_handler(not) { // cur : Exp -> NOT Exp
     node* exp = cur -> siblings[1];
-    return exp -> func(exp);
+    return semantic_handler(exp);
 }
 
 make_handler(if) { // cur : Stmt -> IF LP Exp RP Stmt
                     //cur : Stmt -> IF LP Exp RP Stmt ELSE Stmt
     node* exp = cur -> siblings[2];
-    type_check(exp -> func(exp), type_int, NULL, exp -> lineno, OPERAND_MISMATCH);
+    type_check(semantic_handler(exp), type_int, NULL, exp -> lineno, OPERAND_MISMATCH);
     semantic_handler(cur -> siblings[4]);
     if(cur -> cnt == 7)
         semantic_handler(cur -> siblings[6]);
@@ -425,7 +442,8 @@ make_handler(if) { // cur : Stmt -> IF LP Exp RP Stmt
 
 make_handler(while) { // cur : Stmt -> WHILE LP Exp RP Stmt
     node* exp = cur -> siblings[2];
-    type_check(exp -> func(exp), type_int, NULL, exp -> lineno, OPERAND_MISMATCH);
+    type_check(semantic_handler(exp), type_int, NULL, exp -> lineno, OPERAND_MISMATCH);
     semantic_handler(cur -> siblings[4]);
     return NULL;
 }
+

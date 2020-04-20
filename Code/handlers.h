@@ -4,9 +4,9 @@
 #include"common.h"
 
 #define make_handler(name) \
-    void* name##_handler(node* cur)
+    void* name##_handler(node* cur, operand res)
 
-make_handler(semantic);
+void* semantic_handler(node* cur);
 
 make_handler(def);
 make_handler(variable);

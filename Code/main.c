@@ -28,6 +28,9 @@ int main(int argc, char** argv) {
             init_hash_table();
             semantic_handler(root);
             fun_dec_checker();
+            if(!error_cnt) {
+                //print_ir();
+            }
 
             //table_clear();
             //remove_anonymous_struct();
