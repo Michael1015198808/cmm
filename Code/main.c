@@ -7,6 +7,7 @@
 #include <mcheck.h>
 int error_cnt;
 int yydebug = 0;
+FILE* out_file = NULL;
 
 void fun_dec_checker();
 void free_tree(node* cur);
@@ -17,6 +18,12 @@ int main(int argc, char** argv) {
             perror(argv[1]);
             return 1;
         }
+        if(argv[2]) {
+            if(!(out_file = fopen(argv[2], "w"))) {
+                perror(argv[2]);
+                return 1;
+            }
+        }
     }
     error_cnt = 0;
     if(yyparse()) {
@@ -26,10 +33,10 @@ int main(int argc, char** argv) {
             //mtrace();
 
             init_hash_table();
-            semantic_handler(root);
+            semantic(root);
             fun_dec_checker();
             if(!error_cnt) {
-                //print_ir();
+                print_ir();
             }
 
             //table_clear();

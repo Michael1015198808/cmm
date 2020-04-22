@@ -8,7 +8,7 @@
 
 #define YYSTYPE node*
 
-#define new(type) (type*)malloc(sizeof(type));
+#define new(type) (type*)malloc(sizeof(type))
 
 static inline void* free_first(void* ptr1, void* ptr2) {
     free(ptr1);
@@ -29,8 +29,8 @@ struct node {
     handler func;
     const char* name;
     int cnt, lineno;
+    struct node** siblings;
     union {
-        struct node** siblings;
         char* val_str;
         unsigned int val_int;
         float val_float;

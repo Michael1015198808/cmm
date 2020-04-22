@@ -6,7 +6,7 @@
 #define make_handler(name) \
     void* name##_handler(node* cur, operand res)
 
-void* semantic_handler(node* cur);
+void* semantic(node* cur);
 
 make_handler(def);
 make_handler(variable);
