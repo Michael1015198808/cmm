@@ -46,7 +46,11 @@ float_exp [Ee][\+\-]?{digit}+
 ";"         {TOKEN(SEMI);}
 ","         {TOKEN(COMMA);}
 "="         {TOKEN(ASSIGNOP);}
-">"|"<"|">="|"<="|"=="|"!=" {TOKEN(RELOP);}
+">"|"<"|">="|"<="|"=="|"!=" {
+    yylval = Singleton("RELOP");
+    yylval -> val_str = strdup(yytext);
+    return RELOP;
+}
 "+"         {TOKEN(PLUS);}
 "-"         {TOKEN(MINUS);}
 "*"         {TOKEN(STAR);}

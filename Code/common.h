@@ -23,7 +23,7 @@ int yylineno;
 int yyparse();
 
 typedef struct node node;
-typedef void*(*handler)(node*, operand);
+typedef void*(*handler)(node*, operand, label, label);
 
 struct node {
     handler func;
@@ -64,6 +64,7 @@ static inline node* Singleton(const char* name) {
     return Node(name, yylineno, 0);
 }
 
+#ifdef LOCAL
 #define TODO() \
     do { \
         printf("%s: %d not implemented\n", __FILE__, __LINE__); \
@@ -79,4 +80,9 @@ static inline node* Singleton(const char* name) {
         printf("%s: %d not implemented\n", __FILE__, __LINE__); \
     } while(0)
 
+#else
+#define TODO(...)
+#define Assert(...)
+#define panic(...)
+#endif
 #endif // __COMMON_H__

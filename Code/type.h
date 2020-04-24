@@ -13,6 +13,7 @@ typedef struct FieldList_* FieldList;
 extern CType type_int, type_float;
 
 struct Type_ {
+    unsigned size;
     enum {BASIC, ARRAY, STRUCTURE, STRUCTURE_DEF, FUNCTION, NOTYPE} kind;
     union {
         enum {T_INT, T_FLOAT} basic;
@@ -36,7 +37,7 @@ struct FieldList_ {
     FieldList next;
 };
 
-Type to_array(CType type, int size);
+Type to_array(CType type, unsigned size);
 Type to_struct(int cnt, ...);
 Type to_func(CType ret_val, int cnt, ...);
 

@@ -47,7 +47,16 @@ static inline int output(const char* const fmt, ...) {
 static void print_operand(operand op) {
     if(op) {
         switch(op -> kind) {
+            case ADDRESS:
+                output("*");
+                return print_operand(op -> op);
+            case POINTER:
+                Assert(op -> kind == POINTER);
+                output("&");
             case VARIABLE:
+#ifndef LOCAL
+                output("v_");
+#endif
                 output("%s", op -> val_str);
                 break;
             case TEMP:
@@ -84,15 +93,50 @@ label new_label() {
     return ret;
 }
 
-operand new_temp_operand() {
-    operand ret = new(struct operand_);
-    return set_new_temp_operand(ret);
+void print_label_goto(label l) {
+    ir* cur_ir = new(ir);
+    cur_ir -> func = goto_printer;
+    cur_ir -> l = l;
+    ++(l -> cnt);
+    add_ir(cur_ir);
 }
 
-operand set_new_temp_operand(operand op) {
+void print_label(label l) {
+    ir* cur_ir = new(ir);
+    cur_ir -> func = label_printer;
+    cur_ir -> val_int = l -> no;
+    add_ir(cur_ir);
+}
+
+operand new_temp_operand() {
+    operand ret = new(struct operand_);
+    return set_temp_operand(ret);
+}
+operand set_temp_operand(operand op) {
     static unsigned no = 0;
     op -> kind = TEMP;
     op -> t_no = ++no;
+    return op;
+}
+
+operand new_const_operand(int num) {
+    operand ret = new(struct operand_);
+    return set_const_operand(ret, num);
+}
+operand set_const_operand(operand op, int num) {
+    op -> kind = CONSTANT;
+    op -> val_int = num;
+    return op;
+}
+
+operand new_variable_operand(const char* const name) {
+    operand ret = new(struct operand_);
+    return set_variable_operand(ret, name);
+}
+
+operand set_variable_operand(operand op, const char* const name) {
+    op -> kind = VARIABLE;
+    op -> val_str = name;
     return op;
 }
 
@@ -108,11 +152,24 @@ make_printer(assign) {
 }
 
 make_printer(binary) {
-    print_operand(i -> res);
-    output(" := ");
-    print_operand(i -> op1);
-    output(" %c ", i -> val_int);
-    print_operand(i -> op2);
+    if(i -> res -> kind != ADDRESS) {
+        print_operand(i -> res);
+        output(" := ");
+        print_operand(i -> op1);
+        output(" %c ", i -> val_int);
+        print_operand(i -> op2);
+    } else {
+        operand tmp = new_temp_operand();
+        print_operand(tmp);
+        output(" := ");
+        print_operand(i -> op1);
+        output(" %c ", i -> val_int);
+        print_operand(i -> op2);
+        output("\n");
+        print_operand(i -> res);
+        output(" := ");
+        print_operand(tmp);
+    }
 }
 
 make_printer(function) {
@@ -124,6 +181,11 @@ make_printer(write) {
     print_operand(i -> op1);
 }
 
+make_printer(read) {
+    output("READ ");
+    print_operand(i -> res);
+}
+
 make_printer(fun_call) {
     print_operand(i -> res);
     output(" := CALL ");
@@ -131,10 +193,40 @@ make_printer(fun_call) {
 }
 
 make_printer(fun_dec) {
-    output("FUNCTION %s :", i -> val_str);
+    output("FUNCTION %s :", i -> res -> val_str);
 }
 
 make_printer(param) {
-    output("PARAM ");
+    output("PARAM %s", i -> res -> val_str);
+}
+
+make_printer(label) {
+    output("LABEL l%d :", i -> val_int);
+}
+
+make_printer(goto) {
+    output("GOTO l%d", i -> l -> no);
+}
+
+make_printer(if_goto) {
+    output("IF ");
     print_operand(i -> op1);
+    output(" %s ", i -> val_str);
+    print_operand(i -> op2);
+    output(" ");
+    goto_printer(i);
+}
+
+make_printer(arg) {
+    output("ARG ");
+    print_operand(i -> op1);
+}
+
+make_printer(struct_dec) {
+    output("DEC r_%s %d\n", i -> res -> val_str, i -> val_int);
+    output("%s := &r_%s", i -> res -> val_str, i -> res -> val_str);
+}
+
+make_printer(dec) {
+    output("DEC %s %d", i -> res -> val_str, i -> val_int);
 }

@@ -2,9 +2,10 @@
 #define __HANDLERS_H__
 
 #include"common.h"
+#include "ir.h"
 
 #define make_handler(name) \
-    void* name##_handler(node* cur, operand res)
+    void* name##_handler(node* cur, operand res, label l1, label l2)
 
 void* semantic(node* cur);
 
@@ -27,7 +28,8 @@ make_handler(fun_call);
 make_handler(array_access);
 make_handler(struct_access);
 make_handler(compst);
-make_handler(logic);
+make_handler(and);
+make_handler(or);
 make_handler(relop);
 make_handler(parentheses);
 make_handler(uminus);

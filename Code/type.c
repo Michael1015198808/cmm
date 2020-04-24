@@ -3,9 +3,11 @@
 #include "type.h"
 
 const static struct Type_ type_int_ = {
+    .size = 4,
     .kind = BASIC,
     .basic = T_INT
 }, type_float_ = {
+    .size = 8,
     .kind = BASIC,
     .basic = T_FLOAT
 };
@@ -13,8 +15,9 @@ const static struct Type_ type_int_ = {
 CType type_int = &type_int_;
 CType type_float = &type_float_;
 
-Type to_array(CType base, int size) {
+Type to_array(CType base, unsigned size) {
     Type ret = new(struct Type_);
+    ret -> size = base -> size * size;
     ret -> kind = ARRAY;
     ret -> array.elem = (Type)base;
     ret -> array.size = size;
@@ -34,6 +37,7 @@ Type to_struct(int cnt, ...) {
         for(int i = 0; i < cnt; ++i) {
             last -> name = va_arg(ap, char*);
             last -> type = va_arg(ap, Type);
+            ret -> size += last -> type -> size;
             if(i != cnt - 1) {
                 last -> next = new(struct FieldList_);
                 last = last -> next;
