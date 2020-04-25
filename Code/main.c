@@ -9,6 +9,8 @@ int error_cnt;
 int yydebug = 0;
 FILE* out_file = NULL;
 
+int optimization_level = 0;
+
 void fun_dec_checker();
 void free_tree(node* cur);
 
@@ -36,6 +38,7 @@ int main(int argc, char** argv) {
             semantic(root);
             fun_dec_checker();
             if(!error_cnt) {
+                tot_optimize();
                 print_ir();
             }
 

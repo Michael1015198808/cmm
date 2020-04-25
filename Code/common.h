@@ -8,6 +8,7 @@
 
 #define YYSTYPE node*
 
+
 #define new(type) (type*)malloc(sizeof(type))
 
 static inline void* free_first(void* ptr1, void* ptr2) {
@@ -73,6 +74,7 @@ static inline node* Singleton(const char* name) {
 #define Assert(cond) \
     if(!(cond)) { \
         printf("%s: %d assertion %s failed!\n", __FILE__, __LINE__, #cond); \
+        exit(-1); \
     } while(0)
 
 #define panic() \
@@ -80,9 +82,14 @@ static inline node* Singleton(const char* name) {
         printf("%s: %d not implemented\n", __FILE__, __LINE__); \
     } while(0)
 
+#define IF(cond) \
+    if(cond)
+
 #else
 #define TODO(...)
 #define Assert(...)
 #define panic(...)
+#define IF(cond) \
+    if((cond) && 0)
 #endif
 #endif // __COMMON_H__

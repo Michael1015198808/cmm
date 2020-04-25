@@ -161,10 +161,10 @@ Exp :
   | Exp AND Exp         {$$ = Node3("Exp");$$ -> func = and_handler;}
   | Exp OR Exp          {$$ = Node3("Exp");$$ -> func = or_handler;}
   | Exp RELOP Exp       {$$ = Node3("Exp");$$ -> func = relop_handler;}
-  | Exp PLUS Exp        {$$ = Node3("Exp");$$ -> func = binary_op_handler; $$ -> val_int = '+';}
-  | Exp MINUS Exp       {$$ = Node3("Exp");$$ -> func = binary_op_handler; $$ -> val_int = '-';}
-  | Exp STAR Exp        {$$ = Node3("Exp");$$ -> func = binary_op_handler; $$ -> val_int = '*';}
-  | Exp DIV Exp         {$$ = Node3("Exp");$$ -> func = binary_op_handler; $$ -> val_int = '/';}
+  | Exp PLUS Exp        {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '+';}
+  | Exp MINUS Exp       {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '-';}
+  | Exp STAR Exp        {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '*';}
+  | Exp DIV Exp         {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '/';}
   | LP Exp RP %prec ELSE{$$ = Node3("Exp");$$ -> func = parentheses_handler;}
   | MINUS Exp %prec HIGHER_THAN_MINUS
                         {$$ = Node2("Exp");$$ -> func = uminus_handler;}

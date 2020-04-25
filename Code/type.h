@@ -2,13 +2,17 @@
 #define __TYPE_H__
 
 #include "error.h"
+#include "list.h"
 
 int strcmp(const char*, const char*);
-#define IS(unit) (!strcmp(cur -> name, unit))
 
 typedef struct Type_* Type;
 typedef const struct Type_ * const CType;
-typedef struct FieldList_* FieldList;
+
+typedef LIST_START(FieldList_)
+    char* name;
+    Type type;
+LIST_END *FieldList;
 
 extern CType type_int, type_float;
 
@@ -31,11 +35,6 @@ struct Type_ {
     };
 };
 
-struct FieldList_ {
-    char* name;
-    Type type;
-    FieldList next;
-};
 
 Type to_array(CType type, unsigned size);
 Type to_struct(int cnt, ...);

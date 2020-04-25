@@ -3,6 +3,7 @@
 #include "error.h"
 #include "handlers.h"
 #include "table.h"
+#include "optimization.h"
 
 #define call_with_first_four(func, a, b, c, d, ...) \
     func(a, b, c, d)
@@ -414,16 +415,30 @@ make_handler(assign) { //cur : Exp -> Exp ASSIGNOP Exp
         res = new(struct operand_);
     }
     Type lhs = semantic_handler(cur -> siblings[0], res);
-    if(res -> kind != VARIABLE && res -> kind != ADDRESS && 0) {
+    IF(res -> kind != VARIABLE && res -> kind != ADDRESS) {
         semantic_error(cur -> siblings[0] -> lineno, LVALUE);
         return NULL;
     }
-    Type rhs = semantic_handler(cur -> siblings[2], op2 = new(struct operand_));
-    ir* cur_assign = new(ir);
-    cur_assign -> func = assign_printer;
-    cur_assign -> op1 = op2;
-    cur_assign -> res = res;
-    add_ir(cur_assign);
+    Type rhs = semantic_handler(cur -> siblings[2], op2 = new(struct operand_), l1, l2);
+    if(op2 -> kind == NONE) {
+        label_add_true(l1, res);
+        label_add_false(l2, res);
+    } else {
+        ir* cur_assign = new(ir);
+        cur_assign -> func = assign_printer;
+        cur_assign -> op1 = op2;
+        cur_assign -> res = res;
+        add_ir(cur_assign);
+        if(l1 || l2) {
+            ir* nz_goto = new(ir);
+            nz_goto -> func = if_nz_printer;
+            nz_goto -> l = l1;
+            ++(l1 -> cnt);
+            nz_goto -> op1 = res;
+            add_ir(nz_goto);
+            print_label_goto(l2);
+        }
+    }
     return type_check(lhs, rhs, NULL, cur -> siblings[0] -> lineno, ASSIGN_MISMATCH);
 }
 
@@ -440,19 +455,53 @@ make_handler(id) { //cur : Exp -> ID
     return t;
 }
 
-make_handler(binary_op) {
-    ir* cur_ir = new(ir);
-    Type lhs = semantic_handler(cur -> siblings[0], cur_ir -> op1 = new(struct operand_));
-    Type rhs = semantic_handler(cur -> siblings[2], cur_ir -> op2 = new(struct operand_));
-    /*
-    if(op1 -> kind == CONSTANT && op2 -> kind == CONSTANT) {
-        res -> kind = CONSTANT;
+make_handler(arith) {
+    operand op1, op2;
+    Type lhs = semantic_handler(cur -> siblings[0], op1 = new(struct operand_));
+    Type rhs = semantic_handler(cur -> siblings[2], op2 = new(struct operand_));
+    operand tmp;
+    if(res) {
+        tmp = set_temp_operand(res);
+    } else {
+        tmp = new_temp_operand();
     }
-    */
-    cur_ir -> res = set_temp_operand(res);
-    cur_ir -> func = binary_printer;
-    cur_ir -> val_int = cur -> val_int;
-    add_ir(cur_ir);
+    if(OPTIMIZE(EXP_CONSTANT)
+            && op1 -> kind == CONSTANT && op2 -> kind == CONSTANT) {
+        tmp -> kind = CONSTANT;
+        switch(cur -> val_int) {
+            case '+':
+                tmp -> val_int = op1 -> val_int + op2 -> val_int;
+                break;
+            case '-':
+                tmp -> val_int = op1 -> val_int - op2 -> val_int;
+                break;
+            case '*':
+                tmp -> val_int = op1 -> val_int * op2 -> val_int;
+                break;
+            case '/':
+                tmp -> val_int = op1 -> val_int / op2 -> val_int;
+                break;
+        }
+        free(op1);
+        free(op2);
+    } else {
+        ir* cur_ir = new(ir);
+        cur_ir -> op1 = op1;
+        cur_ir -> op2 = op2;
+        cur_ir -> res = tmp;
+        cur_ir -> func = binary_printer;
+        cur_ir -> val_int = cur -> val_int;
+        add_ir(cur_ir);
+    }
+    if(!res) {
+        ir* nz_goto = new(ir);
+        nz_goto -> func = if_nz_printer;
+        nz_goto -> l = l1;
+        ++(l1 -> cnt);
+        nz_goto -> op1 = tmp;
+        add_ir(nz_goto);
+        print_label_goto(l2);
+    }
     return type_check(lhs, rhs, NULL, cur -> siblings[0] -> lineno, OPERAND_MISMATCH);
 }
 
@@ -460,6 +509,12 @@ make_handler(int) {
     if(res) {
         res -> kind = CONSTANT;
         res -> val_int = cur -> siblings[0] -> val_int;
+    } else if(l1 || l2) {
+        if(cur -> siblings[0] -> val_int) {
+            print_label_goto(l1);
+        } else {
+            print_label_goto(l2);
+        }
     }
     return (void*)type_int;
 }
@@ -548,6 +603,7 @@ make_handler(compst) {
 }
 
 make_handler(and) { //cur : Exp -> Exp AND Exp
+    if(res) res -> kind = NONE;
     label e1true = new_label();
     Type lhs = semantic_handler(cur -> siblings[0], NULL, e1true, l2);
     print_label(e1true);
@@ -558,6 +614,7 @@ make_handler(and) { //cur : Exp -> Exp AND Exp
 }
 
 make_handler(or) { //cur : Exp -> Exp AND Exp
+    if(res) res -> kind = NONE;
     label e1false = new_label();
     Type lhs = semantic_handler(cur -> siblings[0], NULL, e1false, l2);
     print_label(e1false);
@@ -567,19 +624,69 @@ make_handler(or) { //cur : Exp -> Exp AND Exp
     return NULL;
 }
 
+static inline int const_relop_cal(int val1, int val2, const char* cmp) {
+    switch(cmp[0]) {
+        case '!':
+            return val1 != val2;
+        case '=':
+            return val1 == val2;
+        case '>':
+            return val1 > val2 || const_relop_cal(val1, val2, cmp + 1);
+        case '<':
+            return val1 < val2 || const_relop_cal(val1, val2, cmp + 1);
+        case '\0':
+            return 0;
+        default:
+            panic();
+            return 0;
+    }
+}
 make_handler(relop) {// cur : Exp -> Exp RELOP Exp
+    if(res) res -> kind = NONE;
     operand op1, op2;
     Type lhs = semantic_handler(cur -> siblings[0], op1 = new_temp_operand());
     Type rhs = semantic_handler(cur -> siblings[2], op2 = new_temp_operand());
-    ir* if_goto_ir = new(ir);
-    if_goto_ir -> op1 = op1;
-    if_goto_ir -> op2 = op2;
-    if_goto_ir -> val_str = cur -> siblings[1] -> val_str;
-    if_goto_ir -> func = if_goto_printer;
-    if_goto_ir -> l = l1;
-    ++(l1 -> cnt);
-    add_ir(if_goto_ir);
-    print_label_goto(l2);
+    Assert((!((res) && (l1 || l2))));
+    Assert(((res) || (l1 || l2)));
+    if(OPTIMIZE(EXP_CONSTANT)
+            && op1 -> kind == CONSTANT && op2 -> kind == CONSTANT) {
+        if(res) {
+            res -> kind = CONSTANT;
+            res -> val_int = 1;
+        } else {
+            const char* cmp = cur -> siblings[1] -> val_str;
+            print_label_goto(const_relop_cal(op1 -> val_int, op2 -> val_int, cmp)? l1 : l2);
+            free(op1);
+            free(op2);
+        }
+    } else {
+        if(!l2) {
+            ir* assign1_ir = new(ir);
+            assign1_ir -> func = assign_printer;
+            assign1_ir -> op1 = op_one;
+            assign1_ir -> res = set_temp_operand(res);
+            add_ir(assign1_ir);
+            l1 = new_label();
+        }
+        ir* if_goto_ir = new(ir);
+        if_goto_ir -> op1 = op1;
+        if_goto_ir -> op2 = op2;
+        if_goto_ir -> val_str = cur -> siblings[1] -> val_str;
+        if_goto_ir -> func = if_goto_printer;
+        if_goto_ir -> l = l1;
+        ++(l1 -> cnt);
+        add_ir(if_goto_ir);
+        if(!l2) {
+            ir* assign0_ir = new(ir);
+            assign0_ir -> func = assign_printer;
+            assign0_ir -> op1 = op_zero;
+            assign0_ir -> res = res;
+            add_ir(assign0_ir);
+            print_label(l1);
+        } else {
+            print_label_goto(l2);
+        }
+    }
     return type_check(lhs, rhs, type_int, cur -> siblings[0] -> lineno, OPERAND_MISMATCH);
 }
 
@@ -588,15 +695,36 @@ make_handler(parentheses) { // cur : Exp -> LP Exp RP
 }
 
 make_handler(uminus) {
+    operand tmp;
+    if(res) {
+        tmp = set_temp_operand(res);
+    } else {
+        tmp = new_temp_operand();
+    }
     operand op1;
     void* ret = semantic_handler(cur -> siblings[1], op1 = new_temp_operand());
-    ir* cur_ir = new(ir);
-    cur_ir -> func = binary_printer;
-    cur_ir -> val_int = '-';
-    cur_ir -> op1 = op_zero;
-    cur_ir -> op2 = op1;
-    cur_ir -> res = set_temp_operand(res);
-    add_ir(cur_ir);
+    if(OPTIMIZE(EXP_CONSTANT) && op1 -> kind == CONSTANT) {
+        tmp -> kind = CONSTANT;
+        tmp -> val_int = -op1 -> val_int;
+        free(op1);
+    } else {
+        ir* cur_ir = new(ir);
+        cur_ir -> func = binary_printer;
+        cur_ir -> val_int = '-';
+        cur_ir -> op1 = op_zero;
+        cur_ir -> op2 = op1;
+        cur_ir -> res = tmp;
+        add_ir(cur_ir);
+    }
+    if(!res) {
+        ir* nz_goto = new(ir);
+        nz_goto -> func = if_nz_printer;
+        nz_goto -> l = l1;
+        ++(l1 -> cnt);
+        nz_goto -> op1 = tmp;
+        add_ir(nz_goto);
+        print_label_goto(l2);
+    }
     return ret;
 }
 
@@ -613,26 +741,24 @@ make_handler(if) { // cur : Stmt -> IF LP Exp RP Stmt
     type_check(semantic_handler(exp, NULL, ctrue, cfalse), type_int, NULL, exp -> lineno, OPERAND_MISMATCH);
     if(ctrue -> cnt) {
         print_label(ctrue);
+        semantic(cur -> siblings[4]);
     } else {
         free(ctrue);
     }
-    semantic(cur -> siblings[4]);
-    if(cur -> cnt == 7) {
-        label cfinal = new_label();
+    label cfinal = NULL;
+    if(cur -> cnt == 7 || cfalse -> tlist || cfalse -> flist) {
+        cfinal = new_label();
         print_label_goto(cfinal);
-        if(cfalse -> cnt) {
-            print_label(cfalse);
-        } else {
-            free(cfalse);
-        }
-        semantic(cur -> siblings[6]);
-        print_label(cfinal);
+    }
+    if(cfalse -> cnt) {
+        print_label(cfalse);
+        if(cur -> cnt == 7)
+            semantic(cur -> siblings[6]);
     } else {
-        if(cfalse -> cnt) {
-            print_label(cfalse);
-        } else {
-            free(cfalse);
-        }
+        free(cfalse);
+    }
+    if(cfinal) {
+        print_label(cfinal);
     }
     return NULL;
 }

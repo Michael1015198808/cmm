@@ -1,33 +1,27 @@
 #include "common.h"
 #include "ir.h"
 
-//#define PREDEFINE_MAIN
-#ifdef PREDEFINE_MAIN
-static ir main_dec_ir;
-static ir guard = {
-    .prev = &main_dec_ir,
-    .next = &main_dec_ir,
-};
-static ir main_dec_ir = {
-    .prev = &guard,
-    .next = &guard,
-    .func = function_printer,
-    .val_str = "main",
-};
-#else
 static ir guard = {
     .prev = &guard,
     .next = &guard,
+    .func = NULL,
 };
-#endif
 
 static struct operand_ op_zero_ = {
     .kind = CONSTANT,
     .val_int = 0,
+}, op_one_ = {
+    .kind = CONSTANT, 
+    .val_int = 1,
 };
-const operand op_zero = &op_zero_;
+const operand op_zero = &op_zero_, op_one = &op_one_;
 
 extern FILE* const out_file;
+
+void remove_ir(ir* i) {
+    i -> prev -> next = i -> next;
+    i -> next -> prev = i -> prev;
+}
 
 void add_ir(ir* i) {
     i->prev = guard.prev;
@@ -90,7 +84,21 @@ label new_label() {
     label ret = new(struct label_);
     ret -> cnt = 0;
     ret -> no = ++no;
+    ret -> tlist = NULL;
+    ret -> flist = NULL;
     return ret;
+}
+
+void label_add_true(label l, operand op) {
+    LIST_ENTRY(var) *tmp = new(LIST_ENTRY(var));
+    tmp -> info = op;
+    LIST_INSERT_HEAD(l -> tlist, tmp);
+}
+
+void label_add_false(label l, operand op) {
+    LIST_ENTRY(var) *tmp = new(LIST_ENTRY(var));
+    tmp -> info = op;
+    LIST_INSERT_HEAD(l -> flist, tmp);
 }
 
 void print_label_goto(label l) {
@@ -104,7 +112,7 @@ void print_label_goto(label l) {
 void print_label(label l) {
     ir* cur_ir = new(ir);
     cur_ir -> func = label_printer;
-    cur_ir -> val_int = l -> no;
+    cur_ir -> l = l;
     add_ir(cur_ir);
 }
 
@@ -159,14 +167,12 @@ make_printer(binary) {
         output(" %c ", i -> val_int);
         print_operand(i -> op2);
     } else {
+        operand res = i -> res;
         operand tmp = new_temp_operand();
-        print_operand(tmp);
-        output(" := ");
-        print_operand(i -> op1);
-        output(" %c ", i -> val_int);
-        print_operand(i -> op2);
+        i -> res = tmp;
+        binary_printer(i);
         output("\n");
-        print_operand(i -> res);
+        print_operand(res);
         output(" := ");
         print_operand(tmp);
     }
@@ -187,9 +193,20 @@ make_printer(read) {
 }
 
 make_printer(fun_call) {
-    print_operand(i -> res);
-    output(" := CALL ");
-    print_operand(i -> op1);
+    if(i -> res -> kind != ADDRESS) {
+        print_operand(i -> res);
+        output(" := CALL ");
+        print_operand(i -> op1);
+    } else {
+        operand res = i -> res;
+        operand tmp = new_temp_operand();
+        i -> res = tmp;
+        fun_call_printer(i);
+        output("\n");
+        print_operand(res);
+        output(" := ");
+        print_operand(tmp);
+    }
 }
 
 make_printer(fun_dec) {
@@ -201,13 +218,30 @@ make_printer(param) {
 }
 
 make_printer(label) {
-    output("LABEL l%d :", i -> val_int);
+    output("LABEL l%d :", i -> l -> no);
+    LIST_ENTRY(var) *cur;
+    LIST_FOREACH(cur, i -> l -> flist) {
+        output("\n");
+        print_operand(cur -> info);
+        output(" := #0");
+    }
+    LIST_FOREACH(cur, i -> l -> tlist) {
+        output("\n");
+        print_operand(cur -> info);
+        output(" := #1");
+    }
 }
 
 make_printer(goto) {
     output("GOTO l%d", i -> l -> no);
 }
 
+make_printer(if_nz) {
+    output("IF ");
+    print_operand(i -> op1);
+    output(" != #0 ", i -> val_str);
+    goto_printer(i);
+}
 make_printer(if_goto) {
     output("IF ");
     print_operand(i -> op1);
@@ -229,4 +263,99 @@ make_printer(struct_dec) {
 
 make_printer(dec) {
     output("DEC %s %d", i -> res -> val_str, i -> val_int);
+}
+
+static int dummy_goto() {
+    int ret = 0;
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        if(cur -> func == goto_printer) {
+            if(cur -> next -> func == label_printer) {
+                if(cur -> l == cur -> next -> l) {
+                    ret = 1;
+                    --cur -> l -> cnt;
+                    remove_ir(cur);
+                }
+            }
+        }
+    }
+    return ret;
+}
+
+
+static int dummy_label() {
+    int ret = 0;
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        if(cur -> func == label_printer) {
+            Assert(cur -> l -> cnt <= 0x3f3f3f3f);
+            if(cur -> l -> cnt == 0) {
+                ret = 1;
+                remove_ir(cur);
+            }
+        }
+    }
+    return ret;
+}
+
+/*
+static int dummy_read() {
+    int ret = 0;
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        if(cur -> func == read_printer) {
+            if(cur -> next -> func == assign_printer) {
+                if(cur -> res == cur -> next -> op1) {
+                    for(ir* other = cur -> next -> next; other != cur; other = other -> next) {
+                        Assert(cur -> res != other -> op1);
+                        Assert(cur -> res != other -> op2);
+                    }
+                    remove_ir(cur);
+                    cur -> next -> func = read_printer;
+                }
+            }
+        }
+    }
+    return ret;
+}
+*/
+__attribute__((unused)) static int dummy_assign() {
+    int ret = 0;
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        if(cur -> next -> func == assign_printer) {
+            if(cur -> res == cur -> next -> op1) {
+                for(ir* other = cur -> next -> next; other != cur; other = other -> next) {
+                    Assert(cur -> res != other -> op1);
+                    Assert(cur -> res != other -> op2);
+                }
+                ret = 1;
+                cur -> res = cur -> next -> res;
+                remove_ir(cur -> next);
+            }
+        }
+    }
+    return ret;
+}
+
+static int template() {
+    int ret = 0;
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+    }
+    return ret;
+}
+
+static int(*opt_funcs[])() = {
+    dummy_goto,
+    dummy_label,
+    //dummy_read,
+    dummy_assign,
+    NULL,
+};
+
+void tot_optimize() {
+    (void)template;
+    int flag;
+    do {
+        flag = 0;
+        for(int i = 0; opt_funcs[i]; ++i) {
+            flag |= opt_funcs[i]();
+        }
+    } while(flag);
 }

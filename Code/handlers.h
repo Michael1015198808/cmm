@@ -21,7 +21,7 @@ make_handler(fun_def);
 make_handler(return);
 make_handler(assign);
 make_handler(id);
-make_handler(binary_op);
+make_handler(arith);
 make_handler(int);
 make_handler(float);
 make_handler(fun_call);
