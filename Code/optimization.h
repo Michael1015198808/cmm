@@ -4,5 +4,5 @@
 extern int optimization_level;
 #define OPTIMIZE(thing) \
     (optimization_level >= thing)
-#define EXP_CONSTANT 1
+#define ARITH_CONSTANT 1
 #endif //__OPTIMIZATION_H__

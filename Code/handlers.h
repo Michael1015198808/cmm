@@ -36,5 +36,11 @@ make_handler(uminus);
 make_handler(not);
 make_handler(if);
 make_handler(while);
+make_handler(bool_to_int);
+
+#define make_cond_handler(name) \
+    void* name##_cond_handler(node* cur, label l1, label l2)
+
+make_cond_handler(int_to_bool);
 
 #endif

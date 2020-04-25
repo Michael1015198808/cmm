@@ -157,24 +157,24 @@ Dec :
 
 //Expressions
 Exp :
-    Exp ASSIGNOP Exp    {$$ = Node3("Exp");$$ -> func = assign_handler;}
+    Exp ASSIGNOP Exp    {$$ = Node3("Exp");$$ -> func = assign_handler;$$ -> cond = int_to_bool_cond_handler;}
   | Exp AND Exp         {$$ = Node3("Exp");$$ -> func = and_handler;}
   | Exp OR Exp          {$$ = Node3("Exp");$$ -> func = or_handler;}
   | Exp RELOP Exp       {$$ = Node3("Exp");$$ -> func = relop_handler;}
-  | Exp PLUS Exp        {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '+';}
-  | Exp MINUS Exp       {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '-';}
-  | Exp STAR Exp        {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '*';}
-  | Exp DIV Exp         {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '/';}
-  | LP Exp RP %prec ELSE{$$ = Node3("Exp");$$ -> func = parentheses_handler;}
+  | Exp PLUS Exp        {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '+'; $$ -> cond = int_to_bool_cond_handler;}
+  | Exp MINUS Exp       {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '-'; $$ -> cond = int_to_bool_cond_handler;}
+  | Exp STAR Exp        {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '*'; $$ -> cond = int_to_bool_cond_handler;}
+  | Exp DIV Exp         {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '/'; $$ -> cond = int_to_bool_cond_handler;}
+  | LP Exp RP %prec ELSE{$$ = Node3("Exp");$$ -> func = parentheses_handler; $$ -> cond = int_to_bool_cond_handler;}
   | MINUS Exp %prec HIGHER_THAN_MINUS
-                        {$$ = Node2("Exp");$$ -> func = uminus_handler;}
+                        {$$ = Node2("Exp");$$ -> func = uminus_handler; $$ -> cond = int_to_bool_cond_handler;}
   | NOT Exp             {$$ = Node2("Exp");$$ -> func = not_handler;}
-  | ID LP Args RP       {$$ = Node4("Exp");$$ -> func = fun_call_handler;}
-  | ID LP RP            {$$ = Node3("Exp");$$ -> func = fun_call_handler;}
-  | Exp LB Exp x_RB     {$$ = Node4("Exp");$$ -> func = array_access_handler;}
-  | Exp DOT ID          {$$ = Node3("Exp");$$ -> func = struct_access_handler;}
-  | ID                  {$$ = Node1("Exp");$$ -> func = id_handler;}
-  | INT                 {$$ = Node1("Exp");$$ -> func = int_handler;}
+  | ID LP Args RP       {$$ = Node4("Exp");$$ -> func = fun_call_handler; $$ -> cond = int_to_bool_cond_handler;}
+  | ID LP RP            {$$ = Node3("Exp");$$ -> func = fun_call_handler; $$ -> cond = int_to_bool_cond_handler;}
+  | Exp LB Exp x_RB     {$$ = Node4("Exp");$$ -> func = array_access_handler; $$ -> cond = int_to_bool_cond_handler;}
+  | Exp DOT ID          {$$ = Node3("Exp");$$ -> func = struct_access_handler; $$ -> cond = int_to_bool_cond_handler;}
+  | ID                  {$$ = Node1("Exp");$$ -> func = id_handler; $$ -> cond = int_to_bool_cond_handler;}
+  | INT                 {$$ = Node1("Exp");$$ -> func = int_handler; $$ -> cond = int_to_bool_cond_handler;}
   | FLOAT               {$$ = Node1("Exp");$$ -> func = float_handler;}
   | ID LP error RP      {syntax_error(@3.first_line, "Expect expression before ')'.");}
   ;

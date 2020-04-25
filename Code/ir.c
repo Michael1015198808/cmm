@@ -7,14 +7,11 @@ static ir guard = {
     .func = NULL,
 };
 
-static struct operand_ op_zero_ = {
-    .kind = CONSTANT,
-    .val_int = 0,
-}, op_one_ = {
-    .kind = CONSTANT, 
-    .val_int = 1,
-};
-const operand op_zero = &op_zero_, op_one = &op_one_;
+#define make_printer(name) \
+    void name##_printer(ir* i)
+
+make_printer(label);
+make_printer(goto);
 
 extern FILE* const out_file;
 
@@ -152,14 +149,27 @@ make_printer(return) {
     output("RETURN ");
     print_operand(i -> op1);
 }
+void add_return_ir(operand op) {
+    ir* i = new(ir);
+    i -> func = return_printer;
+    i -> op1 = op;
+    add_ir(i);
+}
 
 make_printer(assign) {
     print_operand(i -> res);
     output(" := ");
     print_operand(i -> op1);
 }
+void add_assign_ir(operand to, operand from) {
+    ir* i = new(ir);
+    i -> func = assign_printer;
+    i -> res = to;
+    i -> op1 = from;
+    add_ir(i);
+}
 
-make_printer(binary) {
+make_printer(arith) {
     if(i -> res -> kind != ADDRESS) {
         print_operand(i -> res);
         output(" := ");
@@ -170,33 +180,49 @@ make_printer(binary) {
         operand res = i -> res;
         operand tmp = new_temp_operand();
         i -> res = tmp;
-        binary_printer(i);
+        arith_printer(i);
         output("\n");
         print_operand(res);
         output(" := ");
         print_operand(tmp);
     }
 }
-
-make_printer(function) {
-    output("FUNCTION %s :", i -> val_str);
+void add_arith_ir(operand to, operand lhs, int arith_op, operand rhs) {
+    ir* i = new(ir);
+    i -> func = arith_printer;
+    i -> val_int = arith_op;
+    i -> op1 = lhs;
+    i -> op2 = rhs;
+    i -> res = to;
+    add_ir(i);
 }
 
 make_printer(write) {
     output("WRITE ");
     print_operand(i -> op1);
 }
+void add_write_ir(operand op) {
+    ir* i = new(ir);
+    i -> func = write_printer;
+    i -> op1 = op;
+    add_ir(i) ;
+}
 
 make_printer(read) {
     output("READ ");
     print_operand(i -> res);
 }
+void add_read_ir(operand op) {
+    ir* i = new(ir);
+    i -> func = read_printer;
+    i -> res = op;
+    add_ir(i);
+}
 
 make_printer(fun_call) {
     if(i -> res -> kind != ADDRESS) {
         print_operand(i -> res);
-        output(" := CALL ");
-        print_operand(i -> op1);
+        output(" := CALL %s", i -> val_str);
     } else {
         operand res = i -> res;
         operand tmp = new_temp_operand();
@@ -208,13 +234,32 @@ make_printer(fun_call) {
         print_operand(tmp);
     }
 }
+void add_fun_call_ir(const char* name, operand op) {
+    ir* i = new(ir);
+    i -> func = fun_call_printer;
+    i -> val_str = name;
+    i -> res = op;
+    add_ir(i);
+}
 
 make_printer(fun_dec) {
-    output("FUNCTION %s :", i -> res -> val_str);
+    output("FUNCTION %s :", i -> val_str);
+}
+void add_fun_dec_ir(const char* name) {
+    ir* i = new(ir);
+    i -> func = fun_dec_printer;
+    i -> val_str = name;
+    add_ir(i);
 }
 
 make_printer(param) {
-    output("PARAM %s", i -> res -> val_str);
+    output("PARAM %s", i -> val_str);
+}
+void add_param_ir(const char* name) {
+    ir* i = new(ir);
+    i -> func = param_printer;
+    i -> val_str = name;
+    add_ir(i);
 }
 
 make_printer(label) {
@@ -232,16 +277,10 @@ make_printer(label) {
     }
 }
 
-make_printer(goto) {
+make_printer(goto) { //called by if_nz, if_goto
     output("GOTO l%d", i -> l -> no);
 }
 
-make_printer(if_nz) {
-    output("IF ");
-    print_operand(i -> op1);
-    output(" != #0 ", i -> val_str);
-    goto_printer(i);
-}
 make_printer(if_goto) {
     output("IF ");
     print_operand(i -> op1);
@@ -250,19 +289,41 @@ make_printer(if_goto) {
     output(" ");
     goto_printer(i);
 }
+void add_if_goto_ir(operand op1, operand op2, const char* cmp, label l) {
+    ir* i = new(ir);
+    i -> func = if_goto_printer;
+    i -> op1 = op1;
+    i -> op2 = op2;
+    i -> val_str = cmp;
+    i -> l = l;
+    ++(l -> cnt);
+    add_ir(i);
+}
+void add_if_nz_ir(operand op1, label l) {
+    add_if_goto_ir(op1, new_const_operand(0), "!=", l);
+}
 
 make_printer(arg) {
     output("ARG ");
     print_operand(i -> op1);
 }
-
-make_printer(struct_dec) {
-    output("DEC r_%s %d\n", i -> res -> val_str, i -> val_int);
-    output("%s := &r_%s", i -> res -> val_str, i -> res -> val_str);
+void add_arg_ir(operand op) {
+    ir* i = new(ir);
+    i -> func = arg_printer;
+    i -> op1 = op;
+    add_ir(i);
 }
 
 make_printer(dec) {
-    output("DEC %s %d", i -> res -> val_str, i -> val_int);
+    output("DEC r_%s %d\n", i -> val_str, i -> val_int);
+    output("%s := &r_%s", i -> val_str, i -> val_str);
+}
+void add_dec_ir(const char* name ,unsigned size) {
+    ir* i = new(ir);
+    i -> func = dec_printer;
+    i -> val_str = name;
+    i -> val_int = size;
+    add_ir(i);
 }
 
 static int dummy_goto() {

@@ -25,9 +25,11 @@ int yyparse();
 
 typedef struct node node;
 typedef void*(*handler)(node*, operand, label, label);
+typedef void*(*cond_handler)(node*, label, label);
 
 struct node {
     handler func;
+    cond_handler cond;
     const char* name;
     int cnt, lineno;
     struct node** siblings;
@@ -69,6 +71,7 @@ static inline node* Singleton(const char* name) {
 #define TODO() \
     do { \
         printf("%s: %d not implemented\n", __FILE__, __LINE__); \
+        exit(-1); \
     } while(0)
 
 #define Assert(cond) \
@@ -79,7 +82,8 @@ static inline node* Singleton(const char* name) {
 
 #define panic() \
     do { \
-        printf("%s: %d not implemented\n", __FILE__, __LINE__); \
+        printf("%s: %d should not reach here\n", __FILE__, __LINE__); \
+        exit(-1); \
     } while(0)
 
 #define IF(cond) \

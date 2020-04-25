@@ -15,8 +15,6 @@ struct operand_ {
     };
 };
 
-extern const operand op_zero, op_one;
-
 typedef struct ir_ ir;
 typedef void(*printer)(ir*);
 
@@ -30,15 +28,11 @@ typedef struct label_* label;
 struct ir_ {
     struct ir_ *prev, *next;
     printer func;
-    operand op1, op2;
-    union {
-        operand res;
-        label l;
-    };
-    union {
-        const char* val_str;
-        unsigned int val_int;
-    };//may be needed for more information
+    operand op1, op2, res;
+    label l;
+    const char* val_str;
+    unsigned int val_int;
+    //may be needed for more information
 };
 
 
@@ -60,27 +54,19 @@ operand set_const_operand(operand, int num);
 operand new_variable_operand(const char*);
 operand set_variable_operand(operand, const char*);
 
-#define make_printer(name) \
-    void name##_printer(ir* i)
+void add_return_ir(operand op);
+void add_assign_ir(operand to, operand from);
+void add_arith_ir(operand to, operand lhs, int arith_op, operand rhs);
+void add_write_ir(operand op);
+void add_read_ir(operand op);
+void add_fun_call_ir(const char* name, operand op);
+void add_fun_dec_ir(const char* name);
+void add_param_ir(const char* name);
+void add_if_goto_ir(operand op1, operand op2, const char* cmp, label l);
+void add_if_nz_ir(operand op1, label l);
 
-make_printer(return);
-make_printer(assign);
-make_printer(binary);
-make_printer(function);
-make_printer(write);
-make_printer(read);
-make_printer(fun_call);
-make_printer(fun_dec);
-make_printer(param);
-make_printer(label);
-make_printer(goto);
-make_printer(if_goto);
-make_printer(if_nz);
-
-make_printer(arg);
-make_printer(dec);
-make_printer(struct_dec);
-make_printer(deref);
+void add_arg_ir(operand op);
+void add_dec_ir(const char* name, unsigned size);
 
 void tot_optimize();
 #endif //__IR_H__
