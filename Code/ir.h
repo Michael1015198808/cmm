@@ -6,7 +6,7 @@
 
 typedef struct operand_ *operand;
 struct operand_ {
-    enum {VARIABLE, CONSTANT, ADDRESS, POINTER, TEMP, NONE} kind;
+    enum {VARIABLE, CONSTANT, ADDRESS, POINTER, TEMP, DUMMY} kind;
     union {
         int t_no;
         int val_int;

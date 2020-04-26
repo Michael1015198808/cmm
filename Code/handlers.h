@@ -5,10 +5,11 @@
 #include "ir.h"
 
 #define make_handler(name) \
-    void* name##_handler(node* cur, operand res, label l1, label l2)
+    void* name##_handler(node* cur, operand res)
 
 void* semantic(node* cur);
 
+make_handler(stmt_exp);
 make_handler(def);
 make_handler(variable);
 make_handler(array_dec);
@@ -42,5 +43,9 @@ make_handler(bool_to_int);
     void* name##_cond_handler(node* cur, label l1, label l2)
 
 make_cond_handler(int_to_bool);
+make_cond_handler(and);
+make_cond_handler(or);
+make_cond_handler(relop);
+make_cond_handler(not);
 
 #endif

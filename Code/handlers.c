@@ -5,11 +5,11 @@
 #include "table.h"
 #include "optimization.h"
 
-#define call_with_first_four(func, a, b, c, d, ...) \
-    func(a, b, c, d)
+#define call_with_first_two(func, a, b, ...) \
+    func(a, b)
 
 #define semantic_handler(cur, ...) \
-    call_with_first_four(cur -> func, cur, ##__VA_ARGS__, NULL, NULL, NULL)
+    call_with_first_two(cur -> func, cur, ##__VA_ARGS__, NULL)
 
 /*
 static inline void* semantic_handler(node* cur, operand op) {
@@ -19,7 +19,7 @@ static inline void* semantic_handler(node* cur, operand op) {
 
 void* semantic(node* cur) { // Most top-level handler. Default handler
     if(cur -> func) {
-        return cur -> func(cur, NULL, NULL, NULL);
+        return cur -> func(cur, NULL);
     } else {
         for(int i = 0; i < cur->cnt; ++i) {
             if(cur->siblings[i])
@@ -28,8 +28,14 @@ void* semantic(node* cur) { // Most top-level handler. Default handler
         return NULL;
     }
 }
-static inline void* condition(node* cur, label l1, label l2) {
-    return cur -> cond(cur, l1, l2);
+
+static inline void* condition_handler(node* cur, label l1, label l2) {
+    if(cur -> cond) {
+        return cur -> cond(cur, l1, l2);
+    } else {
+        panic();
+        return int_to_bool_cond_handler(cur, l1, l2);
+    }
 }
 
 char* get_vardec_name(node* cur) {
@@ -40,6 +46,11 @@ char* get_vardec_name(node* cur) {
 }
 
 Type cur_def_type = NULL;
+
+make_handler(stmt_exp) {
+    return semantic_handler(cur -> siblings[0], new(struct operand_));
+}
+
 make_handler(def) {
     Type old_def_type = cur_def_type;
     cur_def_type = semantic(cur -> siblings[0]);
@@ -321,44 +332,32 @@ make_handler(array_access) {// cur : Exp LB Exp RB
     }
     node* exp2 = cur -> siblings[2];
     Type index = semantic_handler(exp2, idx = new_temp_operand());
-    if(res) {
-        base_size = new_const_operand(base -> array.elem -> size);
+    Assert(res);
 
-        add_arith_ir(offset, idx, '*', base_size);
+    base_size = new_const_operand(base -> array.elem -> size);
+    add_arith_ir(offset, idx, '*', base_size);
 
-        if(base -> array.elem -> kind == BASIC) {
-            res -> kind = ADDRESS;
-            res = (res -> op = new_temp_operand());
-        } else {
-            res = set_temp_operand(res);
-        }
-        add_arith_ir(res, offset, '+', array_base_address);
+    if(base -> array.elem -> kind == BASIC) {
+        res -> kind = ADDRESS;
+        res = (res -> op = new_temp_operand());
+    } else {
+        res = set_temp_operand(res);
     }
+    add_arith_ir(res, offset, '+', array_base_address);
 
     return type_check(type_int, index, base -> array.elem, exp2 -> lineno, NOT_INT);
 }
 
 make_handler(assign) { //cur : Exp -> Exp ASSIGNOP Exp
     operand op2;
-    if(!res) {
-        res = new(struct operand_);
-    }
+    Assert(res);
     Type lhs = semantic_handler(cur -> siblings[0], res);
     IF(res -> kind != VARIABLE && res -> kind != ADDRESS) {
         semantic_error(cur -> siblings[0] -> lineno, LVALUE);
         return NULL;
     }
-    Type rhs = semantic_handler(cur -> siblings[2], op2 = new(struct operand_), l1, l2);
-    if(op2 -> kind == NONE) {
-        label_add_true(l1, res);
-        label_add_false(l2, res);
-    } else {
-        add_assign_ir(res, op2);
-        if(l1 || l2) {
-            add_if_nz_ir(res, l1);
-            print_label_goto(l2);
-        }
-    }
+    Type rhs = semantic_handler(cur -> siblings[2], op2 = new(struct operand_));
+    add_assign_ir(res, op2);
     return type_check(lhs, rhs, NULL, cur -> siblings[0] -> lineno, ASSIGN_MISMATCH);
 }
 
@@ -368,17 +367,9 @@ make_handler(id) { //cur : Exp -> ID
     if(!t) {
         semantic_error(id -> lineno, UNDEFINE_VARIABLE, id -> val_str);
     }
-    if(l1 || l2) {
-        if(!res) {
-            res = new_temp_operand();
-        }
-        add_if_nz_ir(res, l1);
-        print_label_goto(l2);
-    }
-    if(res) {
-        res -> kind = VARIABLE;
-        res -> val_str = id -> val_str;
-    }
+    Assert(res);
+    res -> kind = VARIABLE;
+    res -> val_str = id -> val_str;
     return t;
 }
 
@@ -386,37 +377,28 @@ make_handler(arith) {
     operand op1, op2;
     Type lhs = semantic_handler(cur -> siblings[0], op1 = new(struct operand_));
     Type rhs = semantic_handler(cur -> siblings[2], op2 = new(struct operand_));
-    operand tmp;
-    if(res) {
-        tmp = set_temp_operand(res);
-    } else {
-        tmp = new_temp_operand();
-    }
+    Assert(res);
     if(OPTIMIZE(ARITH_CONSTANT)
             && op1 -> kind == CONSTANT && op2 -> kind == CONSTANT) {
-        tmp -> kind = CONSTANT;
+        res -> kind = CONSTANT;
         switch(cur -> val_int) {
             case '+':
-                tmp -> val_int = op1 -> val_int + op2 -> val_int;
+                res -> val_int = op1 -> val_int + op2 -> val_int;
                 break;
             case '-':
-                tmp -> val_int = op1 -> val_int - op2 -> val_int;
+                res -> val_int = op1 -> val_int - op2 -> val_int;
                 break;
             case '*':
-                tmp -> val_int = op1 -> val_int * op2 -> val_int;
+                res -> val_int = op1 -> val_int * op2 -> val_int;
                 break;
             case '/':
-                tmp -> val_int = op1 -> val_int / op2 -> val_int;
+                res -> val_int = op1 -> val_int / op2 -> val_int;
                 break;
         }
         free(op1);
         free(op2);
     } else {
-        add_arith_ir(tmp, op1, cur -> val_int, op2);
-    }
-    if(!res) {
-        add_if_nz_ir(tmp, l1);
-        print_label_goto(l2);
+        add_arith_ir(set_temp_operand(res), op1, cur -> val_int, op2);
     }
     return type_check(lhs, rhs, NULL, cur -> siblings[0] -> lineno, OPERAND_MISMATCH);
 }
@@ -424,14 +406,12 @@ make_handler(arith) {
 make_handler(bool_to_int) {
     label ctrue  = new_label();
     label cfalse = new_label();
-    label cfinal = new_label();
-    void* ret = condition(cur, ctrue, cfalse);
+    Assert(res);
+    add_assign_ir(set_temp_operand(res), new_const_operand(0));
+    void* ret = condition_handler(cur, ctrue, cfalse);
     print_label(ctrue);
     add_assign_ir(res, new_const_operand(1));
-    print_label_goto(cfinal);
     print_label(cfalse);
-    add_assign_ir(res, new_const_operand(0));
-    print_label(cfinal);
     return ret;
 }
 
@@ -439,12 +419,6 @@ make_handler(int) {
     if(res) {
         res -> kind = CONSTANT;
         res -> val_int = cur -> siblings[0] -> val_int;
-    } else if(l1 || l2) {
-        if(cur -> siblings[0] -> val_int) {
-            print_label_goto(l1);
-        } else {
-            print_label_goto(l2);
-        }
     }
     return (void*)type_int;
 }
@@ -529,78 +503,6 @@ make_handler(compst) {
     return NULL;
 }
 
-make_handler(and) { //cur : Exp -> Exp AND Exp
-    if(res) res -> kind = NONE;
-    label e1true = new_label();
-    Type lhs = semantic_handler(cur -> siblings[0], NULL, e1true, l2);
-    print_label(e1true);
-    Type rhs = semantic_handler(cur -> siblings[2], NULL, l1, l2);
-    if(type_check(lhs, type_int, NULL, cur -> siblings[0] -> lineno, OPERAND_MISMATCH))
-        return type_check(rhs, type_int, NULL, cur -> siblings[2] -> lineno, OPERAND_MISMATCH);
-    return NULL;
-}
-
-make_handler(or) { //cur : Exp -> Exp AND Exp
-    if(res) res -> kind = NONE;
-    label e1false = new_label();
-    Type lhs = semantic_handler(cur -> siblings[0], NULL, l1, e1false);
-    print_label(e1false);
-    Type rhs = semantic_handler(cur -> siblings[2], NULL, l1, l2);
-    if(type_check(lhs, type_int, NULL, cur -> siblings[0] -> lineno, OPERAND_MISMATCH))
-        return type_check(rhs, type_int, NULL, cur -> siblings[2] -> lineno, OPERAND_MISMATCH);
-    return NULL;
-}
-
-static inline int const_relop_cal(int val1, int val2, const char* cmp) {
-    switch(cmp[0]) {
-        case '!':
-            return val1 != val2;
-        case '=':
-            return val1 == val2;
-        case '>':
-            return val1 > val2 || const_relop_cal(val1, val2, cmp + 1);
-        case '<':
-            return val1 < val2 || const_relop_cal(val1, val2, cmp + 1);
-        case '\0':
-            return 0;
-        default:
-            panic();
-            return 0;
-    }
-}
-make_handler(relop) {// cur : Exp -> Exp RELOP Exp
-    if(res) res -> kind = NONE;
-    operand op1, op2;
-    Type lhs = semantic_handler(cur -> siblings[0], op1 = new_temp_operand());
-    Type rhs = semantic_handler(cur -> siblings[2], op2 = new_temp_operand());
-    Assert((!((res) && (l1 || l2))));
-    Assert(((res) || (l1 || l2)));
-    if(OPTIMIZE(ARITH_CONSTANT)
-            && op1 -> kind == CONSTANT && op2 -> kind == CONSTANT) {
-        if(res) {
-            res -> kind = CONSTANT;
-            res -> val_int = 1;
-        } else {
-            const char* cmp = cur -> siblings[1] -> val_str;
-            print_label_goto(const_relop_cal(op1 -> val_int, op2 -> val_int, cmp)? l1 : l2);
-            free(op1);
-            free(op2);
-        }
-    } else {
-        if(!l2) {
-            add_assign_ir(set_temp_operand(res), new_const_operand(1));
-            l1 = new_label();
-        }
-        add_if_goto_ir(op1, op2, cur -> siblings[1] -> val_str, l1);
-        if(!l2) {
-            add_assign_ir(res, new_const_operand(0));
-            print_label(l1);
-        } else {
-            print_label_goto(l2);
-        }
-    }
-    return type_check(lhs, rhs, type_int, cur -> siblings[0] -> lineno, OPERAND_MISMATCH);
-}
 
 make_handler(parentheses) { // cur : Exp -> LP Exp RP
     return semantic_handler(cur -> siblings[1], res, l1, l2);
@@ -620,33 +522,9 @@ make_handler(uminus) {
         tmp -> val_int = -op1 -> val_int;
         free(op1);
     } else {
-        add_arith_ir(tmp, 0, '-', op1);
-    }
-    if(!res) {
-        add_if_nz_ir(tmp, l1);
-        print_label_goto(l2);
+        add_arith_ir(tmp, new_const_operand(0), '-', op1);
     }
     return ret;
-}
-
-make_handler(not) { // cur : Exp -> NOT Exp
-    node* exp = cur -> siblings[1];
-    if(l1 || l2) {
-        Assert(res == NULL);
-        return semantic_handler(exp, NULL, l2, l1);
-    } else {
-        Assert(res);
-        label ctrue = new_label(), cfalse = new_label(), cfinal = new_label();
-        Type ret = semantic_handler(exp, NULL, cfalse, ctrue);
-        set_temp_operand(res);
-        print_label(ctrue);
-        add_assign_ir(res, new_const_operand(1));
-        print_label_goto(cfinal);
-        print_label(cfalse);
-        add_assign_ir(res, new_const_operand(0));
-        print_label(cfinal);
-        return ret;
-    }
 }
 
 make_handler(if) { // cur : Stmt -> IF LP Exp RP Stmt
@@ -654,7 +532,7 @@ make_handler(if) { // cur : Stmt -> IF LP Exp RP Stmt
     node* exp = cur -> siblings[2];
     label ctrue  = new_label(),
           cfalse = new_label();
-    type_check(semantic_handler(exp, NULL, ctrue, cfalse), type_int, NULL, exp -> lineno, OPERAND_MISMATCH);
+    type_check(condition_handler(exp, ctrue, cfalse), type_int, NULL, exp -> lineno, OPERAND_MISMATCH);
     if(ctrue -> cnt) {
         print_label(ctrue);
         semantic(cur -> siblings[4]);
@@ -685,7 +563,7 @@ make_handler(while) { // cur : Stmt -> WHILE LP Exp RP Stmt
           start  = new_label();
     node* exp = cur -> siblings[2];
     print_label(start);
-    type_check(semantic_handler(exp, NULL, wtrue, wfalse), type_int, NULL, exp -> lineno, OPERAND_MISMATCH);
+    type_check(condition_handler(exp, wtrue, wfalse), type_int, NULL, exp -> lineno, OPERAND_MISMATCH);
     print_label(wtrue);
     semantic(cur -> siblings[4]);
     print_label_goto(start);
@@ -699,4 +577,65 @@ make_cond_handler(int_to_bool) {
     add_if_nz_ir(op, l1);
     print_label_goto(l2);
     return ret;
+}
+
+make_cond_handler(and) { //cur : Exp -> Exp AND Exp
+    label e1true = new_label();
+    Type lhs = condition_handler(cur -> siblings[0], e1true, l2);
+    print_label(e1true);
+    Type rhs = condition_handler(cur -> siblings[2], l1, l2);
+    if(type_check(lhs, type_int, NULL, cur -> siblings[0] -> lineno, OPERAND_MISMATCH))
+        return type_check(rhs, type_int, NULL, cur -> siblings[2] -> lineno, OPERAND_MISMATCH);
+    return NULL;
+}
+
+make_cond_handler(or) { //cur : Exp -> Exp AND Exp
+    label e1false = new_label();
+    Type lhs = condition_handler(cur -> siblings[0], l1, e1false);
+    print_label(e1false);
+    Type rhs = condition_handler(cur -> siblings[2], l1, l2);
+    if(type_check(lhs, type_int, NULL, cur -> siblings[0] -> lineno, OPERAND_MISMATCH))
+        return type_check(rhs, type_int, NULL, cur -> siblings[2] -> lineno, OPERAND_MISMATCH);
+    return NULL;
+}
+
+static inline int const_relop_cal(int val1, int val2, const char* cmp) {
+    switch(cmp[0]) {
+        case '!':
+            return val1 != val2;
+        case '=':
+            return val1 == val2;
+        case '>':
+            return val1 > val2 || const_relop_cal(val1, val2, cmp + 1);
+        case '<':
+            return val1 < val2 || const_relop_cal(val1, val2, cmp + 1);
+        case '\0':
+            return 0;
+        default:
+            panic();
+            return 0;
+    }
+}
+
+make_cond_handler(relop) {// cur : Exp -> Exp RELOP Exp
+    operand op1, op2;
+    Type lhs = semantic_handler(cur -> siblings[0], op1 = new_temp_operand());
+    Type rhs = semantic_handler(cur -> siblings[2], op2 = new_temp_operand());
+    if(OPTIMIZE(ARITH_CONSTANT)
+            && op1 -> kind == CONSTANT && op2 -> kind == CONSTANT) {
+        const char* cmp = cur -> siblings[1] -> val_str;
+        print_label_goto(const_relop_cal(op1 -> val_int, op2 -> val_int, cmp)? l1 : l2);
+        free(op1);
+        free(op2);
+    } else {
+        add_if_goto_ir(op1, op2, cur -> siblings[1] -> val_str, l1);
+        print_label_goto(l2);
+    }
+    return type_check(lhs, rhs, type_int, cur -> siblings[0] -> lineno, OPERAND_MISMATCH);
+}
+
+make_cond_handler(not) { // cur : Exp -> NOT Exp
+    node* exp = cur -> siblings[1];
+    Assert(l1 || l2);
+    return condition_handler(exp, l2, l1);
 }

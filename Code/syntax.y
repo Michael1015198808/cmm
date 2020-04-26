@@ -125,7 +125,7 @@ StmtList :
   | %empty          {$$ = Node0("StmtList");}
   ;
 Stmt :
-    Exp x_SEMI                              {$$ = Node2("Stmt");}
+    Exp x_SEMI                              {$$ = Node2("Stmt");$$ -> func = stmt_exp_handler;}
   | CompSt                                  {$$ = Node1("Stmt");}
   | RETURN Exp x_SEMI                       {$$ = Node3("Stmt");$$ -> func = return_handler;}
   | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {$$ = Node5("Stmt");$$ -> func = if_handler;}
@@ -158,9 +158,9 @@ Dec :
 //Expressions
 Exp :
     Exp ASSIGNOP Exp    {$$ = Node3("Exp");$$ -> func = assign_handler;$$ -> cond = int_to_bool_cond_handler;}
-  | Exp AND Exp         {$$ = Node3("Exp");$$ -> func = and_handler;}
-  | Exp OR Exp          {$$ = Node3("Exp");$$ -> func = or_handler;}
-  | Exp RELOP Exp       {$$ = Node3("Exp");$$ -> func = relop_handler;}
+  | Exp AND Exp         {$$ = Node3("Exp");$$ -> func = bool_to_int_handler;$$ -> cond = and_cond_handler;}
+  | Exp OR Exp          {$$ = Node3("Exp");$$ -> func = bool_to_int_handler;$$ -> cond = or_cond_handler;}
+  | Exp RELOP Exp       {$$ = Node3("Exp");$$ -> func = bool_to_int_handler;$$ -> cond = relop_cond_handler;}
   | Exp PLUS Exp        {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '+'; $$ -> cond = int_to_bool_cond_handler;}
   | Exp MINUS Exp       {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '-'; $$ -> cond = int_to_bool_cond_handler;}
   | Exp STAR Exp        {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '*'; $$ -> cond = int_to_bool_cond_handler;}
@@ -168,7 +168,7 @@ Exp :
   | LP Exp RP %prec ELSE{$$ = Node3("Exp");$$ -> func = parentheses_handler; $$ -> cond = int_to_bool_cond_handler;}
   | MINUS Exp %prec HIGHER_THAN_MINUS
                         {$$ = Node2("Exp");$$ -> func = uminus_handler; $$ -> cond = int_to_bool_cond_handler;}
-  | NOT Exp             {$$ = Node2("Exp");$$ -> func = not_handler;}
+  | NOT Exp             {$$ = Node2("Exp");$$ -> func = bool_to_int_handler;$$ -> cond = not_cond_handler;}
   | ID LP Args RP       {$$ = Node4("Exp");$$ -> func = fun_call_handler; $$ -> cond = int_to_bool_cond_handler;}
   | ID LP RP            {$$ = Node3("Exp");$$ -> func = fun_call_handler; $$ -> cond = int_to_bool_cond_handler;}
   | Exp LB Exp x_RB     {$$ = Node4("Exp");$$ -> func = array_access_handler; $$ -> cond = int_to_bool_cond_handler;}

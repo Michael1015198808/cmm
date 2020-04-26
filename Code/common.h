@@ -24,11 +24,13 @@ int yylineno;
 int yyparse();
 
 typedef struct node node;
-typedef void*(*handler)(node*, operand, label, label);
+typedef void*(*semantic_handler)(node*);
+typedef void*(*exp_handler)(node*, operand);
 typedef void*(*cond_handler)(node*, label, label);
 
 struct node {
-    handler func;
+    semantic_handler seman;
+    exp_handler func;
     cond_handler cond;
     const char* name;
     int cnt, lineno;

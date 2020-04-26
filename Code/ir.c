@@ -81,21 +81,7 @@ label new_label() {
     label ret = new(struct label_);
     ret -> cnt = 0;
     ret -> no = ++no;
-    ret -> tlist = NULL;
-    ret -> flist = NULL;
     return ret;
-}
-
-void label_add_true(label l, operand op) {
-    LIST_ENTRY(var) *tmp = new(LIST_ENTRY(var));
-    tmp -> info = op;
-    LIST_INSERT_HEAD(l -> tlist, tmp);
-}
-
-void label_add_false(label l, operand op) {
-    LIST_ENTRY(var) *tmp = new(LIST_ENTRY(var));
-    tmp -> info = op;
-    LIST_INSERT_HEAD(l -> flist, tmp);
 }
 
 void print_label_goto(label l) {
@@ -264,17 +250,6 @@ void add_param_ir(const char* name) {
 
 make_printer(label) {
     output("LABEL l%d :", i -> l -> no);
-    LIST_ENTRY(var) *cur;
-    LIST_FOREACH(cur, i -> l -> flist) {
-        output("\n");
-        print_operand(cur -> info);
-        output(" := #0");
-    }
-    LIST_FOREACH(cur, i -> l -> tlist) {
-        output("\n");
-        print_operand(cur -> info);
-        output(" := #1");
-    }
 }
 
 make_printer(goto) { //called by if_nz, if_goto
@@ -395,6 +370,19 @@ __attribute__((unused)) static int dummy_assign() {
     return ret;
 }
 
+static int dummy_temp() {
+    int ret = 0;
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        if(cur -> res) {
+            if(cur -> res -> kind == DUMMY) {
+                ret = 1;
+                remove_ir(cur);
+            }
+        }
+    }
+    return ret;
+}
+
 static int template() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
@@ -407,6 +395,7 @@ static int(*opt_funcs[])() = {
     dummy_label,
     //dummy_read,
     dummy_assign,
+    dummy_temp,
     NULL,
 };
 
