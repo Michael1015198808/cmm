@@ -13,6 +13,23 @@
     #define Node5(name) Node(name, yylsp[-4].first_line, 5, yyvsp[-4], yyvsp[-3], yyvsp[-2], yyvsp[-1], yyvsp[0])
     #define Node6(name) Node(name, yylsp[-5].first_line, 6, yyvsp[-5], yyvsp[-4], yyvsp[-3], yyvsp[-2], yyvsp[-1], yyvsp[0])
     #define Node7(name) Node(name, yylsp[-6].first_line, 7, yyvsp[-6], yyvsp[-5], yyvsp[-4], yyvsp[-3], yyvsp[-2], yyvsp[-1], yyvsp[0])
+
+    #define set_semantic(name) \
+    do{ \
+        (yyval) -> kind = STMT; \
+        (yyval) -> semantic = name##_semantic_handler; \
+    } while(0)
+
+    #define set_arith(name) \
+    do{ \
+        (yyval) -> kind = ARITH; \
+        (yyval) -> arith = name##_arith_handler; \
+    } while(0)
+    #define set_cond(name) \
+    do{ \
+        (yyval) -> kind = COND; \
+        (yyval) -> cond = name##_cond_handler; \
+    } while(0)
     int yyerror(char* msg) {}
     char* get_vardec_name();
     node* root;
@@ -65,21 +82,21 @@ ExtDefList :
   | %empty              {$$ = Node0("ExtDefList"); @$.first_line = yylineno;}
   ;
 ExtDef :
-    Specifier ExtDecList x_SEMI   {$$ = Node3("ExtDef");$$ -> func = def_handler;}
-  | Specifier x_SEMI              {$$ = Node2("ExtDef");$$ -> func = def_handler;}
-  | Specifier FunDec CompSt       {$$ = Node3("ExtDef");$$ -> func = fun_def_handler;}
-  | Specifier FunDec SEMI         {$$ = Node3("ExtDef");$$ -> func = fun_dec_handler;}
+    Specifier ExtDecList x_SEMI   {$$ = Node3("ExtDef");set_semantic(def);}
+  | Specifier x_SEMI              {$$ = Node2("ExtDef");set_semantic(def);}
+  | Specifier FunDec CompSt       {$$ = Node3("ExtDef");set_semantic(fun_def);}
+  | Specifier FunDec SEMI         {$$ = Node3("ExtDef");set_semantic(fun_dec);}
   | error SEMI                    {syntax_error(@1.first_line, "Something wrong with declaration.");}
   ;
 ExtDecList :
-    VarDec                  {$$ = Node1("ExtDecList");$$ -> func = vardec_handler;}
-  | VarDec COMMA ExtDecList {$$ = Node3("ExtDecList");$$ -> func = extdeclist_handler;}
+    VarDec                  {$$ = Node1("ExtDecList");set_semantic(vardec);}
+  | VarDec COMMA ExtDecList {$$ = Node3("ExtDecList");set_semantic(extdeclist);}
   ;
 
 //Specifiers
 Specifier :
-    TYPE                {$$ = Node1("Specifier");$$->func = type_handler;}
-  | StructSpecifier     {$$ = Node1("Specifier");$$->func = struct_specifier_handler;}
+    TYPE                {$$ = Node1("Specifier");set_semantic(type);}
+  | StructSpecifier     {$$ = Node1("Specifier");set_semantic(struct_specifier);}
   ;
 StructSpecifier :
     STRUCT OptTag LC DefList RC {$$ = Node5("StructSpecifier");}
@@ -96,8 +113,8 @@ Tag :
 
 //Declarators
 VarDec :
-    ID                    {$$ = Node1("VarDec");$$ -> func = variable_handler;}
-  | VarDec LB INT x_RB    {$$ = Node4("VarDec");$$ -> func = array_dec_handler;}
+    ID                    {$$ = Node1("VarDec");set_semantic(variable);}
+  | VarDec LB INT x_RB    {$$ = Node4("VarDec");set_semantic(array_dec);}
   | VarDec LB error RB    {syntax_error(@3.first_line, "Size of array %s should be an integer.", get_vardec_name($1));$$ = Node0("VarDec");}
   ;
 FunDec :
@@ -117,7 +134,7 @@ ParamDec :
 
 //Statements
 CompSt :
-    LC DefList StmtList RC  {$$ = Node4("CompSt");$$ -> func = compst_handler;}
+    LC DefList StmtList RC  {$$ = Node4("CompSt");set_semantic(compst);}
   | LC DefList error RC     {syntax_error(@3.first_line, "Error in the sentence(missing ;?).");$$ = Node3("CompSt");}
   ;
 StmtList :
@@ -125,12 +142,12 @@ StmtList :
   | %empty          {$$ = Node0("StmtList");}
   ;
 Stmt :
-    Exp x_SEMI                              {$$ = Node2("Stmt");$$ -> func = stmt_exp_handler;}
+    Exp x_SEMI                              {$$ = Node2("Stmt");set_semantic(stmt_exp);}
   | CompSt                                  {$$ = Node1("Stmt");}
-  | RETURN Exp x_SEMI                       {$$ = Node3("Stmt");$$ -> func = return_handler;}
-  | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {$$ = Node5("Stmt");$$ -> func = if_handler;}
-  | IF LP Exp RP Stmt ELSE Stmt             {$$ = Node7("Stmt");$$ -> func = if_handler;}
-  | WHILE LP Exp RP Stmt                    {$$ = Node5("Stmt");$$ -> func = while_handler;}
+  | RETURN Exp x_SEMI                       {$$ = Node3("Stmt");set_semantic(return);}
+  | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {$$ = Node5("Stmt");set_semantic(if);}
+  | IF LP Exp RP Stmt ELSE Stmt             {$$ = Node7("Stmt");set_semantic(if);}
+  | WHILE LP Exp RP Stmt                    {$$ = Node5("Stmt");set_semantic(while);}
   | LP Exp SEMI %prec LOWEST                {syntax_error(@1.first_line, "Missing \")\".");}
   | Bad_exp error                           {syntax_error(@2.first_line, "Something wrong with the expression(expect expression before token '%s' ).", yylval->name);} SEMI                      
   | LP error RP SEMI                        {syntax_error(@2.first_line, "Expect expression before ')'.");}
@@ -144,38 +161,38 @@ DefList :
   | %empty      {$$ = Node0("DefList");}
   ;
 Def :
-    Specifier DecList x_SEMI  {$$ = Node3("Def");$$ -> func = def_handler;}
+    Specifier DecList x_SEMI  {$$ = Node3("Def");set_semantic(def);}
   ;
 DecList :
     Dec                 {$$ = Node1("DecList");}
   | Dec COMMA DecList   {$$ = Node3("DecList");}
   ;
 Dec :
-    VarDec              {$$ = Node1("Dec");$$ -> func = vardec_handler;}
-  | VarDec ASSIGNOP Exp {$$ = Node3("Dec");$$ -> func = vardec_handler;}
+    VarDec              {$$ = Node1("Dec");set_semantic(vardec);}
+  | VarDec ASSIGNOP Exp {$$ = Node3("Dec");set_semantic(vardec);}
   ;
 
 //Expressions
 Exp :
-    Exp ASSIGNOP Exp    {$$ = Node3("Exp");$$ -> func = assign_handler;$$ -> cond = int_to_bool_cond_handler;}
-  | Exp AND Exp         {$$ = Node3("Exp");$$ -> func = bool_to_int_handler;$$ -> cond = and_cond_handler;}
-  | Exp OR Exp          {$$ = Node3("Exp");$$ -> func = bool_to_int_handler;$$ -> cond = or_cond_handler;}
-  | Exp RELOP Exp       {$$ = Node3("Exp");$$ -> func = bool_to_int_handler;$$ -> cond = relop_cond_handler;}
-  | Exp PLUS Exp        {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '+'; $$ -> cond = int_to_bool_cond_handler;}
-  | Exp MINUS Exp       {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '-'; $$ -> cond = int_to_bool_cond_handler;}
-  | Exp STAR Exp        {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '*'; $$ -> cond = int_to_bool_cond_handler;}
-  | Exp DIV Exp         {$$ = Node3("Exp");$$ -> func = arith_handler; $$ -> val_int = '/'; $$ -> cond = int_to_bool_cond_handler;}
-  | LP Exp RP %prec ELSE{$$ = Node3("Exp");$$ -> func = parentheses_handler; $$ -> cond = int_to_bool_cond_handler;}
+    Exp ASSIGNOP Exp    {$$ = Node3("Exp");set_arith(assign);}
+  | Exp PLUS Exp        {$$ = Node3("Exp");set_arith(arith);$$ -> val_int = '+';}
+  | Exp MINUS Exp       {$$ = Node3("Exp");set_arith(arith);$$ -> val_int = '-';}
+  | Exp STAR Exp        {$$ = Node3("Exp");set_arith(arith);$$ -> val_int = '*';}
+  | Exp DIV Exp         {$$ = Node3("Exp");set_arith(arith);$$ -> val_int = '/';}
+  | LP Exp RP %prec ELSE{$$ = $2;}
+  | ID LP Args RP       {$$ = Node4("Exp");set_arith(fun_call);}
+  | ID LP RP            {$$ = Node3("Exp");set_arith(fun_call);}
+  | Exp LB Exp x_RB     {$$ = Node4("Exp");set_arith(array_access);}
+  | Exp DOT ID          {$$ = Node3("Exp");set_arith(struct_access);}
+  | ID                  {$$ = Node1("Exp");set_arith(id);}
+  | INT                 {$$ = Node1("Exp");set_arith(int);}
+  | FLOAT               {$$ = Node1("Exp");set_arith(float);}
   | MINUS Exp %prec HIGHER_THAN_MINUS
-                        {$$ = Node2("Exp");$$ -> func = uminus_handler; $$ -> cond = int_to_bool_cond_handler;}
-  | NOT Exp             {$$ = Node2("Exp");$$ -> func = bool_to_int_handler;$$ -> cond = not_cond_handler;}
-  | ID LP Args RP       {$$ = Node4("Exp");$$ -> func = fun_call_handler; $$ -> cond = int_to_bool_cond_handler;}
-  | ID LP RP            {$$ = Node3("Exp");$$ -> func = fun_call_handler; $$ -> cond = int_to_bool_cond_handler;}
-  | Exp LB Exp x_RB     {$$ = Node4("Exp");$$ -> func = array_access_handler; $$ -> cond = int_to_bool_cond_handler;}
-  | Exp DOT ID          {$$ = Node3("Exp");$$ -> func = struct_access_handler; $$ -> cond = int_to_bool_cond_handler;}
-  | ID                  {$$ = Node1("Exp");$$ -> func = id_handler; $$ -> cond = int_to_bool_cond_handler;}
-  | INT                 {$$ = Node1("Exp");$$ -> func = int_handler; $$ -> cond = int_to_bool_cond_handler;}
-  | FLOAT               {$$ = Node1("Exp");$$ -> func = float_handler;}
+                        {$$ = Node2("Exp");set_arith(uminus);}
+  | Exp AND Exp         {$$ = Node3("Exp");set_cond(and);}
+  | Exp OR Exp          {$$ = Node3("Exp");set_cond(or);}
+  | Exp RELOP Exp       {$$ = Node3("Exp");set_cond(relop);}
+  | NOT Exp             {$$ = Node2("Exp");set_cond(not);}
   | ID LP error RP      {syntax_error(@3.first_line, "Expect expression before ')'.");}
   ;
 Bad_exp :

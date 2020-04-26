@@ -25,13 +25,16 @@ int yyparse();
 
 typedef struct node node;
 typedef void*(*semantic_handler)(node*);
-typedef void*(*exp_handler)(node*, operand);
+typedef void*(*arith_handler)(node*, operand);
 typedef void*(*cond_handler)(node*, label, label);
 
 struct node {
-    semantic_handler seman;
-    exp_handler func;
-    cond_handler cond;
+    union {
+        semantic_handler semantic;
+        arith_handler arith;
+        cond_handler cond;
+    };
+    enum {STMT, ARITH, COND} kind;
     const char* name;
     int cnt, lineno;
     struct node** siblings;
@@ -46,7 +49,8 @@ extern node* root;
 
 static inline node* Node(const char* name,int lineno, int cnt, ...) {
     node* ret = (node*)malloc(sizeof(node));
-    ret -> func = NULL;
+    ret -> kind = STMT;
+    ret -> semantic = NULL;
     ret -> name = name;
     ret -> cnt = cnt;
     ret -> lineno = lineno;

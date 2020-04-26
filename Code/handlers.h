@@ -4,48 +4,48 @@
 #include"common.h"
 #include "ir.h"
 
-#define make_handler(name) \
-    void* name##_handler(node* cur, operand res)
+#define make_semantic_handler(name) \
+    void* name##_semantic_handler(node* cur)
 
-void* semantic(node* cur);
-
-make_handler(stmt_exp);
-make_handler(def);
-make_handler(variable);
-make_handler(array_dec);
-make_handler(extdeclist);
-make_handler(vardec);
-make_handler(type);
-make_handler(struct_specifier);
-make_handler(fun_dec);
-make_handler(fun_def);
-make_handler(return);
-make_handler(assign);
-make_handler(id);
-make_handler(arith);
-make_handler(int);
-make_handler(float);
-make_handler(fun_call);
-make_handler(array_access);
-make_handler(struct_access);
-make_handler(compst);
-make_handler(and);
-make_handler(or);
-make_handler(relop);
-make_handler(parentheses);
-make_handler(uminus);
-make_handler(not);
-make_handler(if);
-make_handler(while);
-make_handler(bool_to_int);
+#define make_arith_handler(name) \
+    void* name##_arith_handler(node* cur, operand res)
 
 #define make_cond_handler(name) \
     void* name##_cond_handler(node* cur, label l1, label l2)
 
-make_cond_handler(int_to_bool);
+void* semantic(node* cur);
+
+make_semantic_handler(stmt_exp);
+make_semantic_handler(def);
+make_semantic_handler(variable);
+make_semantic_handler(array_dec);
+make_semantic_handler(extdeclist);
+make_semantic_handler(vardec);
+make_semantic_handler(type);
+make_semantic_handler(struct_specifier);
+make_semantic_handler(fun_dec);
+make_semantic_handler(fun_def);
+make_semantic_handler(return);
+make_semantic_handler(if);
+make_semantic_handler(while);
+make_semantic_handler(compst);
+
+make_arith_handler(assign);
+make_arith_handler(id);
+make_arith_handler(arith);
+make_arith_handler(int);
+make_arith_handler(float);
+make_arith_handler(fun_call);
+make_arith_handler(array_access);
+make_arith_handler(struct_access);
+make_arith_handler(uminus);
+make_arith_handler(bool_to_int);
+
 make_cond_handler(and);
 make_cond_handler(or);
 make_cond_handler(relop);
 make_cond_handler(not);
+make_cond_handler(int_to_bool);
+
 
 #endif
