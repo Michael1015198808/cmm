@@ -44,7 +44,7 @@ char* get_vardec_name(node* cur) {
 Type cur_def_type = NULL;
 
 make_semantic_handler(stmt_exp) {
-    return arithmatic(cur -> siblings[0], new(struct operand_));
+    return arithmatic(cur -> siblings[0], NULL);
 }
 
 make_semantic_handler(def) {
@@ -296,13 +296,15 @@ make_arith_handler(struct_access) {// cur : Exp DOT ID
         unsigned offset = 0;
         for(FieldList f = t -> structure;f;f = f -> next) {
             if(!strcmp(f -> name, cur -> siblings[2] -> val_str)) {
-                if(f -> type -> kind == BASIC) {
-                    res -> kind = ADDRESS;
-                    res = (res -> op = new_temp_operand());
-                } else {
-                    res = set_temp_operand(res);
+                if(res) {
+                    if(f -> type -> kind == BASIC) {
+                        res -> kind = ADDRESS;
+                        res = (res -> op = new_temp_operand());
+                    } else {
+                        res = set_temp_operand(res);
+                    }
+                    add_arith_ir(res, op1, '+', new_const_operand(offset));
                 }
-                add_arith_ir(res, op1, '+', new_const_operand(offset));
 
                 return f -> type;
             }
@@ -323,31 +325,38 @@ make_arith_handler(array_access) {// cur : Exp LB Exp RB
     }
     node* exp2 = cur -> siblings[2];
     Type index = arithmatic(exp2, idx = new_temp_operand());
-    Assert(res);
 
-    base_size = new_const_operand(base -> array.elem -> size);
-    add_arith_ir(offset, idx, '*', base_size);
+    if(res) {
+        base_size = new_const_operand(base -> array.elem -> size);
+        add_arith_ir(offset, idx, '*', base_size);
 
-    if(base -> array.elem -> kind == BASIC) {
-        res -> kind = ADDRESS;
-        res = (res -> op = new_temp_operand());
-    } else {
-        res = set_temp_operand(res);
+        if(base -> array.elem -> kind == BASIC) {
+            res -> kind = ADDRESS;
+            res = (res -> op = new_temp_operand());
+        } else {
+            res = set_temp_operand(res);
+        }
+        add_arith_ir(res, offset, '+', array_base_address);
     }
-    add_arith_ir(res, offset, '+', array_base_address);
 
     return type_check(type_int, index, base -> array.elem, exp2 -> lineno, NOT_INT);
 }
 
 make_arith_handler(assign) { //cur : Exp -> Exp ASSIGNOP Exp
     operand op2;
-    Assert(res);
+    if(!res) {
+        res = new(struct operand_);
+    }
+    Type rhs = arithmatic(cur -> siblings[2], op2 = new(struct operand_));
+    if(OPTIMIZE(ARITH_CONSTANT) && op2 -> kind == CONSTANT) {
+        set_const_operand(res, op2 -> val_int);
+        res = new(struct operand_);
+    }
     Type lhs = arithmatic(cur -> siblings[0], res);
     IF(res -> kind != VARIABLE && res -> kind != ADDRESS) {
         semantic_error(cur -> siblings[0] -> lineno, LVALUE);
         return NULL;
     }
-    Type rhs = arithmatic(cur -> siblings[2], op2 = new(struct operand_));
     add_assign_ir(res, op2);
     return type_check(lhs, rhs, NULL, cur -> siblings[0] -> lineno, ASSIGN_MISMATCH);
 }
@@ -358,52 +367,43 @@ make_arith_handler(id) { //cur : Exp -> ID
     if(!t) {
         semantic_error(id -> lineno, UNDEFINE_VARIABLE, id -> val_str);
     }
-    Assert(res);
-    res -> kind = VARIABLE;
-    res -> val_str = id -> val_str;
+    if(res) {
+        res -> kind = VARIABLE;
+        res -> val_str = id -> val_str;
+    }
     return t;
 }
 
 make_arith_handler(arith) {
-    operand op1, op2;
-    Type lhs = arithmatic(cur -> siblings[0], op1 = new(struct operand_));
-    Type rhs = arithmatic(cur -> siblings[2], op2 = new(struct operand_));
-    Assert(res);
-    if(OPTIMIZE(ARITH_CONSTANT)
-            && op1 -> kind == CONSTANT && op2 -> kind == CONSTANT) {
-        res -> kind = CONSTANT;
-        switch(cur -> val_int) {
-            case '+':
-                res -> val_int = op1 -> val_int + op2 -> val_int;
-                break;
-            case '-':
-                res -> val_int = op1 -> val_int - op2 -> val_int;
-                break;
-            case '*':
-                res -> val_int = op1 -> val_int * op2 -> val_int;
-                break;
-            case '/':
-                res -> val_int = op1 -> val_int / op2 -> val_int;
-                break;
-        }
-        free(op1);
-        free(op2);
-    } else {
+    operand op1 = NULL, op2 = NULL;
+    if(res) {
+        op1 = new(struct operand_);
+        op2 = new(struct operand_);
+    }
+    Type lhs = arithmatic(cur -> siblings[0], op1);
+    Type rhs = arithmatic(cur -> siblings[2], op2);
+    if(res) {
         add_arith_ir(set_temp_operand(res), op1, cur -> val_int, op2);
     }
     return type_check(lhs, rhs, NULL, cur -> siblings[0] -> lineno, OPERAND_MISMATCH);
 }
 
 make_arith_handler(bool_to_int) {
-    label ctrue  = new_label();
-    label cfalse = new_label();
-    Assert(res);
-    add_assign_ir(set_temp_operand(res), new_const_operand(0));
-    void* ret = condition(cur, ctrue, cfalse);
-    print_label(ctrue);
-    add_assign_ir(res, new_const_operand(1));
-    print_label(cfalse);
-    return ret;
+    if(res) {
+        label ctrue  = new_label();
+        label cfalse = new_label();
+        add_assign_ir(set_temp_operand(res), new_const_operand(0));
+        void* ret = condition(cur, ctrue, cfalse);
+        print_label(ctrue);
+        add_assign_ir(res, new_const_operand(1));
+        print_label(cfalse);
+        return ret;
+    } else {
+        label next = new_label();
+        void* ret = condition(cur, next, next);
+        print_label(next);
+        return ret;
+    }
 }
 
 make_arith_handler(int) {
@@ -438,8 +438,11 @@ make_arith_handler(fun_call) {// cur : ID LP Args RP
         add_write_ir(op);
     } else if(!strcmp(fun -> val_str, "read")) {
         if(res) {
-            add_read_ir(set_temp_operand(res));
+            set_temp_operand(res);
+        } else {
+            res = new_temp_operand();
         }
+        add_read_ir(res);
     } else {
         if(cur -> cnt == 4) {
             FieldList param = func -> structure -> next;
@@ -496,21 +499,9 @@ make_semantic_handler(compst) {
 
 
 make_arith_handler(uminus) {
-    operand tmp;
-    if(res) {
-        tmp = set_temp_operand(res);
-    } else {
-        tmp = new_temp_operand();
-    }
     operand op1;
     void* ret = arithmatic(cur -> siblings[1], op1 = new_temp_operand());
-    if(OPTIMIZE(ARITH_CONSTANT) && op1 -> kind == CONSTANT) {
-        tmp -> kind = CONSTANT;
-        tmp -> val_int = -op1 -> val_int;
-        free(op1);
-    } else {
-        add_arith_ir(tmp, new_const_operand(0), '-', op1);
-    }
+    add_arith_ir(set_temp_operand(res), new_const_operand(0), '-', op1);
     return ret;
 }
 
@@ -520,18 +511,18 @@ make_semantic_handler(if) { // cur : Stmt -> IF LP Exp RP Stmt
     label ctrue  = new_label(),
           cfalse = new_label();
     type_check(condition(exp, ctrue, cfalse), type_int, NULL, exp -> lineno, OPERAND_MISMATCH);
-    if(ctrue -> cnt) {
+    if(*(ctrue -> cnt)) {
         print_label(ctrue);
         semantic(cur -> siblings[4]);
     } else {
         free(ctrue);
     }
     label cfinal = NULL;
-    if(cur -> cnt == 7 || cfalse -> tlist || cfalse -> flist) {
-        cfinal = new_label();
-        print_label_goto(cfinal);
-    }
-    if(cfalse -> cnt) {
+    if(*(cfalse -> cnt)) {
+        if(cur -> cnt == 7) {
+            cfinal = new_label();
+            print_label_goto(cfinal);
+        }
         print_label(cfalse);
         if(cur -> cnt == 7)
             semantic(cur -> siblings[6]);
@@ -561,8 +552,12 @@ make_semantic_handler(while) { // cur : Stmt -> WHILE LP Exp RP Stmt
 make_cond_handler(int_to_bool) {
     operand op;
     void* ret = arithmatic(cur, op = new(struct operand_));
-    add_if_nz_ir(op, l1);
-    print_label_goto(l2);
+    if(OPTIMIZE(LOGIC_CONSTANT) && op -> kind == CONSTANT) {
+        print_label_goto(op -> val_int? l1:l2);
+    } else {
+        add_if_nz_ir(op, l1);
+        print_label_goto(l2);
+    }
     return ret;
 }
 

@@ -1,5 +1,7 @@
+#include "optimization.h"
 #include "common.h"
 #include "ir.h"
+void* memcpy(void*, const void*, size_t);
 
 static ir guard = {
     .prev = &guard,
@@ -12,12 +14,16 @@ static ir guard = {
 
 make_printer(label);
 make_printer(goto);
+make_printer(if_goto);
 
 extern FILE* const out_file;
 
 void remove_ir(ir* i) {
     i -> prev -> next = i -> next;
     i -> next -> prev = i -> prev;
+    if(i -> func == goto_printer || i -> func == if_goto_printer) {
+        --*(i -> l -> cnt);
+    }
 }
 
 void add_ir(ir* i) {
@@ -79,16 +85,23 @@ void print_ir() {
 label new_label() {
     static unsigned no = 0;
     label ret = new(struct label_);
-    ret -> cnt = 0;
+    ret -> cnt = new(unsigned);
+    *ret -> cnt = 0;
     ret -> no = ++no;
     return ret;
+}
+static inline void merge_label(label l1, label l2) {
+    l1 -> no = l2 -> no;
+    *(l1 -> cnt) += *(l2 -> cnt);
+    free(l2 -> cnt);
+    l2 -> cnt = l1 -> cnt;
 }
 
 void print_label_goto(label l) {
     ir* cur_ir = new(ir);
     cur_ir -> func = goto_printer;
     cur_ir -> l = l;
-    ++(l -> cnt);
+    ++(*l -> cnt);
     add_ir(cur_ir);
 }
 
@@ -128,6 +141,17 @@ operand new_variable_operand(const char* const name) {
 operand set_variable_operand(operand op, const char* const name) {
     op -> kind = VARIABLE;
     op -> val_str = name;
+    return op;
+}
+
+operand new_dummy_operand() {
+    operand ret = new(struct operand_);
+    return set_dummy_operand(ret);
+}
+operand set_dummy_operand(operand op) {
+    static unsigned no = 0;
+    op -> kind = DUMMY;
+    op -> t_no = ++no;
     return op;
 }
 
@@ -173,13 +197,78 @@ make_printer(arith) {
         print_operand(tmp);
     }
 }
-void add_arith_ir(operand to, operand lhs, int arith_op, operand rhs) {
+void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
+    if(OPTIMIZE(ARITH_CONSTANT)) {
+        if(op1 -> kind == CONSTANT && op2 -> kind == CONSTANT) {
+            res -> kind = CONSTANT;
+            switch(arith_op) {
+                case '+':
+                    res -> val_int = op1 -> val_int + op2 -> val_int;
+                    break;
+                case '-':
+                    res -> val_int = op1 -> val_int - op2 -> val_int;
+                    break;
+                case '*':
+                    res -> val_int = op1 -> val_int * op2 -> val_int;
+                    break;
+                case '/':
+                    res -> val_int = op1 -> val_int / op2 -> val_int;
+                    break;
+            }
+            free(op1);
+            free(op2);
+            return;
+        } else {
+            operand cons = NULL, other = NULL;
+            if(op1 -> kind == CONSTANT) {
+                cons = op1;
+            } else {
+                other = op1;
+            }
+            if(op2 -> kind == CONSTANT) {
+                cons = op2;
+            } else {
+                other = op2;
+            }
+            if(cons) {
+                switch(arith_op) {
+                    case '-':
+                        if(cons == op1)break;
+                        //other - cons
+                    case '+':
+                        //other + cons or cons + other
+                        if(cons -> val_int == 0) {
+                            memcpy(res, other, sizeof(*res));
+                            return;
+                        }
+                        break;
+                    case '/':
+                        if(cons == op1) {
+                            //cons / other
+                            if(cons -> val_int == 0) {
+                                set_const_operand(res, 0);
+                                return;
+                            }
+                            break;
+                        }
+                        //other / cons
+                    case '*':
+                        //other * cons or cons * other
+                        if(cons -> val_int == 1) {
+                            memcpy(res, other, sizeof(*res));
+                            return;
+                        }
+                        break;
+                }
+            }
+        }
+    }
     ir* i = new(ir);
     i -> func = arith_printer;
     i -> val_int = arith_op;
-    i -> op1 = lhs;
-    i -> op2 = rhs;
-    i -> res = to;
+    i -> op1 = op1;
+    i -> op2 = op2;
+    i -> res = res;
     add_ir(i);
 }
 
@@ -271,7 +360,7 @@ void add_if_goto_ir(operand op1, operand op2, const char* cmp, label l) {
     i -> op2 = op2;
     i -> val_str = cmp;
     i -> l = l;
-    ++(l -> cnt);
+    ++(*l -> cnt);
     add_ir(i);
 }
 void add_if_nz_ir(operand op1, label l) {
@@ -301,14 +390,13 @@ void add_dec_ir(const char* name ,unsigned size) {
     add_ir(i);
 }
 
-static int dummy_goto() {
+static int dummy_goto() { //remove goto next line
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
         if(cur -> func == goto_printer) {
             if(cur -> next -> func == label_printer) {
                 if(cur -> l == cur -> next -> l) {
                     ret = 1;
-                    --cur -> l -> cnt;
                     remove_ir(cur);
                 }
             }
@@ -318,12 +406,12 @@ static int dummy_goto() {
 }
 
 
-static int dummy_label() {
+static int dummy_label() { //remove labels that will not be jumped to
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
         if(cur -> func == label_printer) {
-            Assert(cur -> l -> cnt <= 0x3f3f3f3f);
-            if(cur -> l -> cnt == 0) {
+            Assert(*(cur -> l -> cnt) <= 0x3f3f3f3f);
+            if(*(cur -> l -> cnt) == 0) {
                 ret = 1;
                 remove_ir(cur);
             }
@@ -352,7 +440,7 @@ static int dummy_read() {
     return ret;
 }
 */
-__attribute__((unused)) static int dummy_assign() {
+__attribute__((unused)) static int dummy_assign() { //remove dummy chain assign
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
         if(cur -> next -> func == assign_printer) {
@@ -383,6 +471,39 @@ static int dummy_temp() {
     return ret;
 }
 
+static int adj_label() { //remove adjacent label
+    int ret = 0;
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        if(cur -> func == label_printer) {
+            if(cur -> next -> func == label_printer) {
+                ret = 1;
+                merge_label(cur -> l, cur -> next -> l);
+                remove_ir(cur);
+            }
+        }
+    }
+    return ret;
+}
+
+static int stmt_after_return() { //remove statements after return
+    int ret = 0;
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        if(cur -> func == return_printer) {
+            for(ir* i = cur -> next; i != &guard; i = i -> next) {
+                if(i -> func == label_printer) {
+                    break;
+                } else if(i -> func == fun_dec_printer) {
+                    break;
+                } else {
+                    ret = 1;
+                    remove_ir(i);
+                }
+            }
+        }
+    }
+    return ret;
+}
+
 static int template() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
@@ -398,18 +519,19 @@ static struct {
     {dummy_label, 1},
     //{dummy_read, 1},
     {dummy_assign, 1},
+    {adj_label, 1},
     {dummy_temp, 1},
+    {stmt_after_return, 1},
     {NULL, 0},
 };
 
-extern int optimization_level;
 void tot_optimize() {
     (void)template;
     int flag;
     do {
         flag = 0;
         for(int i = 0; optimizers[i].func; ++i) {
-            if(optimization_level >= optimizers[i].level)
+            if(OPTIMIZE(optimizers[i].level))
                 flag |= optimizers[i].func();
         }
     } while(flag);

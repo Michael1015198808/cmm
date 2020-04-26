@@ -20,8 +20,8 @@ typedef void(*printer)(ir*);
 
 
 struct label_ {
-    LIST(var, operand) *tlist, *flist;
-    unsigned cnt, no;
+    unsigned* cnt;
+    unsigned no;
 };
 typedef struct label_* label;
 
@@ -53,6 +53,9 @@ operand set_const_operand(operand, int num);
 
 operand new_variable_operand(const char*);
 operand set_variable_operand(operand, const char*);
+
+operand new_dummy_operand(void);
+operand set_dummy_operand(operand);
 
 void add_return_ir(operand op);
 void add_assign_ir(operand to, operand from);

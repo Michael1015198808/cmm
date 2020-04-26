@@ -23,7 +23,7 @@ int main(int argc, const char** argv) {
             semantic(root);
             fun_dec_checker();
             if(!error_cnt) {
-                //tot_optimize();
+                tot_optimize();
                 print_ir();
             }
 

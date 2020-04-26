@@ -6,4 +6,5 @@ extern int optimization_level;
     (optimization_level >= thing)
 
 #define ARITH_CONSTANT 1
+#define LOGIC_CONSTANT 1
 #endif //__OPTIMIZATION_H__
