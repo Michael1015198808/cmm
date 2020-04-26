@@ -390,22 +390,27 @@ static int template() {
     return ret;
 }
 
-static int(*opt_funcs[])() = {
-    dummy_goto,
-    dummy_label,
-    //dummy_read,
-    dummy_assign,
-    dummy_temp,
-    NULL,
+static struct {
+    int (*func)(void);
+    int level;
+} optimizers[] = {
+    {dummy_goto, 1},
+    {dummy_label, 1},
+    //{dummy_read, 1},
+    {dummy_assign, 1},
+    {dummy_temp, 1},
+    {NULL, 0},
 };
 
+extern int optimization_level;
 void tot_optimize() {
     (void)template;
     int flag;
     do {
         flag = 0;
-        for(int i = 0; opt_funcs[i]; ++i) {
-            flag |= opt_funcs[i]();
+        for(int i = 0; optimizers[i].func; ++i) {
+            if(optimization_level >= optimizers[i].level)
+                flag |= optimizers[i].func();
         }
     } while(flag);
 }

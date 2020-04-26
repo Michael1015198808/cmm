@@ -8,6 +8,7 @@
 
 #define YYSTYPE node*
 
+#define err(...) fprintf(stderr, __VA_ARGS__)
 
 #define new(type) (type*)malloc(sizeof(type))
 

@@ -5,13 +5,7 @@
 #include "table.h"
 #include "optimization.h"
 
-/*
-static inline void* semantic_handler(node* cur, operand op) {
-    return cur -> func(cur, op, NULL, NULL);
-}
-*/
-
-void* semantic(node* cur) { // Most top-level handler. Default handler
+void* semantic(node* cur) { // Most top-level handler. Default handler for statements.
     Assert(cur -> kind == STMT);
     if(cur -> semantic) {
         return cur -> semantic(cur);
@@ -123,12 +117,12 @@ static inline Type deflist_to_struct_type(node* cur) {
     for(;cur && cur -> cnt == 2; cur = cur -> siblings[1]) {
         node* def = cur -> siblings[0];
         node* specifier = def -> siblings[0];
-        Type t = semantic(specifier);
+        Assert(cur_def_type == NULL);
+        cur_def_type = semantic(specifier);
         for(node* declist = def -> siblings[1];; declist = declist -> siblings[2]) {
             node* vardec = declist -> siblings[0] -> siblings[0];
             last -> next = new(struct FieldList_);
             last = last -> next;
-            cur_def_type = t;
             last -> type = semantic(vardec);
             last -> name = get_vardec_name(vardec);
             ret -> size += last -> type -> size;
@@ -142,6 +136,7 @@ static inline Type deflist_to_struct_type(node* cur) {
                 break;
             }
         }
+        cur_def_type = NULL;
     }
     last -> next = NULL;
     ret -> kind = STRUCTURE;
