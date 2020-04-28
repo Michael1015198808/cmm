@@ -342,13 +342,16 @@ make_handler(fun_call) {// cur : ID LP Args RP
 make_handler(array_access) {// cur : Exp LB Exp RB
     node* exp1 = cur -> siblings[0];
     Type base = exp1 -> func(exp1);
-    if(base -> kind != ARRAY) {
-        semantic_error(exp1 -> lineno, NOT_ARRAY);
-        return NULL;
+    if(base) {
+        if(base -> kind != ARRAY) {
+            semantic_error(exp1 -> lineno, NOT_ARRAY);
+            return NULL;
+        }
+        node* exp2 = cur -> siblings[2];
+        Type index = exp2 -> func(exp2);
+        return type_check(type_int, index, base -> array.elem, exp2 -> lineno, NOT_INT);
     }
-    node* exp2 = cur -> siblings[2];
-    Type index = exp2 -> func(exp2);
-    return type_check(type_int, index, base -> array.elem, exp2 -> lineno, NOT_INT);
+    return NULL;
 }
 
 make_handler(struct_access) {// cur : Exp DOT ID
