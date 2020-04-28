@@ -27,6 +27,7 @@ make_semantic_handler(fun_dec);
 make_semantic_handler(fun_def);
 make_semantic_handler(return);
 make_semantic_handler(if);
+make_semantic_handler(if_else);
 make_semantic_handler(while);
 make_semantic_handler(compst);
 

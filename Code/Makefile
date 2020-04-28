@@ -5,7 +5,7 @@
 CC = gcc
 FLEX = flex
 BISON = bison
-CFLAGS = -std=c99 -g -Wall -Werror -DLOCAL
+CFLAGS = -std=c99 -g -Wall -Werror -pedantic -Wno-c99-c11-compat -DLOCAL
 
 # 编译目标：src目录下的所有.c文件
 CFILES = $(shell find ./ -name "*.c")

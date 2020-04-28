@@ -2,6 +2,7 @@
 #define __COMMON_H__
 
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include "ir.h"
@@ -10,7 +11,7 @@
 
 #define err(...) fprintf(stderr, __VA_ARGS__)
 
-#define new(type) (type*)malloc(sizeof(type))
+#define new(type) (type*)memset(malloc(sizeof(type)), 0, sizeof(type))
 
 static inline void* free_first(void* ptr1, void* ptr2) {
     free(ptr1);

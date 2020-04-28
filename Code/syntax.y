@@ -146,7 +146,7 @@ Stmt :
   | CompSt                                  {$$ = Node1("Stmt");}
   | RETURN Exp x_SEMI                       {$$ = Node3("Stmt");set_semantic(return);}
   | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {$$ = Node5("Stmt");set_semantic(if);}
-  | IF LP Exp RP Stmt ELSE Stmt             {$$ = Node7("Stmt");set_semantic(if);}
+  | IF LP Exp RP Stmt ELSE Stmt             {$$ = Node7("Stmt");set_semantic(if_else);}
   | WHILE LP Exp RP Stmt                    {$$ = Node5("Stmt");set_semantic(while);}
   | LP Exp SEMI %prec LOWEST                {syntax_error(@1.first_line, "Missing \")\".");}
   | Bad_exp error                           {syntax_error(@2.first_line, "Something wrong with the expression(expect expression before token '%s' ).", yylval->name);} SEMI                      

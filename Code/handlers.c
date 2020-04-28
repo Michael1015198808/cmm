@@ -62,9 +62,12 @@ make_semantic_handler(variable) {// cur : VarDec -> ID
 }
 
 make_semantic_handler(array_dec) {// cur : VarDec -> VarDec LB INT RB
-    node* vardec = cur -> siblings[0];
-    Type t = semantic(vardec);
-    return to_array(t, cur -> siblings[2] -> val_int);
+    Assert(cur_def_type);
+    Type old_def_type = cur_def_type;
+    cur_def_type = to_array(cur_def_type, cur -> siblings[2] -> val_int);
+    Type t = semantic(cur -> siblings[0]);
+    cur_def_type = old_def_type;
+    return t;
 }
 
 make_semantic_handler(extdeclist) {
@@ -199,12 +202,13 @@ static Type fun_parsing(node* cur, int is_dec) {
             if(table_insert(last -> name, t)) {
                 semantic_error(paramdec -> lineno, REDEFINE_VARIABLE, last -> name);
             };
-            add_param_ir(last -> name);
+            add_param_ir_buffered(last -> name);
             if(varlist -> cnt == 1) {
                 break;
             }
         }
     }
+    add_param_ir_flush();
     last -> next = NULL;
     return ret;
 }
@@ -319,27 +323,31 @@ make_arith_handler(array_access) {// cur : Exp LB Exp RB
     node* exp1 = cur -> siblings[0];
     operand array_base_address, idx, base_size, offset = new_temp_operand();
     Type base = arithmatic(exp1, array_base_address = new_temp_operand());
-    if(base -> kind != ARRAY) {
-        semantic_error(exp1 -> lineno, NOT_ARRAY);
-        return NULL;
-    }
-    node* exp2 = cur -> siblings[2];
-    Type index = arithmatic(exp2, idx = new_temp_operand());
 
-    if(res) {
-        base_size = new_const_operand(base -> array.elem -> size);
-        add_arith_ir(offset, idx, '*', base_size);
-
-        if(base -> array.elem -> kind == BASIC) {
-            res -> kind = ADDRESS;
-            res = (res -> op = new_temp_operand());
-        } else {
-            res = set_temp_operand(res);
+    if(base) {
+        if(base -> kind != ARRAY) {
+            semantic_error(exp1 -> lineno, NOT_ARRAY);
+            return NULL;
         }
-        add_arith_ir(res, offset, '+', array_base_address);
-    }
+        node* exp2 = cur -> siblings[2];
+        Type index = arithmatic(exp2, idx = new_temp_operand());
 
-    return type_check(type_int, index, base -> array.elem, exp2 -> lineno, NOT_INT);
+        if(res) {
+            base_size = new_const_operand(base -> array.elem -> size);
+            add_arith_ir(offset, idx, '*', base_size);
+
+            if(base -> array.elem -> kind == BASIC) {
+                res -> kind = ADDRESS;
+                res = (res -> op = new_temp_operand());
+            } else {
+                res = set_temp_operand(res);
+            }
+            add_arith_ir(res, offset, '+', array_base_address);
+        }
+
+        return type_check(type_int, index, base -> array.elem, exp2 -> lineno, NOT_INT);
+    }
+    return NULL;
 }
 
 make_arith_handler(assign) { //cur : Exp -> Exp ASSIGNOP Exp
@@ -481,7 +489,6 @@ make_arith_handler(fun_call) {// cur : ID LP Args RP
 }
 
 
-
 static void* compst_without_scope(node* cur) {
     if(cur -> siblings[1])
         semantic(cur -> siblings[1]);
@@ -506,31 +513,43 @@ make_arith_handler(uminus) {
 }
 
 make_semantic_handler(if) { // cur : Stmt -> IF LP Exp RP Stmt
-                    //cur : Stmt -> IF LP Exp RP Stmt ELSE Stmt
     node* exp = cur -> siblings[2];
     label ctrue  = new_label(),
           cfalse = new_label();
     type_check(condition(exp, ctrue, cfalse), type_int, NULL, exp -> lineno, OPERAND_MISMATCH);
-    if(*(ctrue -> cnt)) {
+    if(ctrue -> cnt) {
         print_label(ctrue);
         semantic(cur -> siblings[4]);
     } else {
         free(ctrue);
     }
-    label cfinal = NULL;
-    if(*(cfalse -> cnt)) {
-        if(cur -> cnt == 7) {
-            cfinal = new_label();
-            print_label_goto(cfinal);
-        }
+    if(cfalse -> cnt) {
         print_label(cfalse);
-        if(cur -> cnt == 7)
-            semantic(cur -> siblings[6]);
     } else {
         free(cfalse);
     }
-    if(cfinal) {
+    return NULL;
+}
+
+make_semantic_handler(if_else) { //cur : Stmt -> IF LP Exp RP Stmt ELSE Stmt
+    node* exp = cur -> siblings[2];
+    label ctrue  = new_label(),
+          cfalse = new_label();
+    type_check(condition(exp, ctrue, cfalse), type_int, NULL, exp -> lineno, OPERAND_MISMATCH);
+    if(ctrue -> cnt) {
+        print_label(ctrue);
+        semantic(cur -> siblings[4]);
+    } else {
+        free(ctrue);
+    }
+    if(cfalse -> cnt) {
+        label cfinal = new_label();
+        print_label_goto(cfinal);
+        print_label(cfalse);
+        semantic(cur -> siblings[6]);
         print_label(cfinal);
+    } else {
+        free(cfalse);
     }
     return NULL;
 }

@@ -17,36 +17,89 @@ make_printer(goto);
 make_printer(if_goto);
 
 extern FILE* const out_file;
+int opcmp(operand op1, operand op2) {
+    if(op1 && op2) {
+        if(op1->kind == op2->kind) {
+            switch(op1->kind) {
+                case CONSTANT:
+                    return op1->val_int!=op2->val_int;
+                case POINTER:
+                case VARIABLE:
+                    return strcmp(op1->val_str, op2->val_str);
+                case TEMP:
+                    return op1->t_no!=op2->t_no;
+                case ADDRESS:
+                    return opcmp(op1->op, op2->op);
+                default:
+                    Assert(0);
+                    return 1;
+            }
+        }
+        return 1;
+    } else {
+        return op1 || op2;
+    }
+}
+
+static inline label find(label* lp) {
+    label l = *lp;
+    if(l -> parent != l) {
+        Assert(l -> cnt == 0);
+        return *lp = l -> parent = find(&l -> parent);
+    } else {
+        return l;
+    }
+}
 
 void remove_ir(ir* i) {
     i -> prev -> next = i -> next;
     i -> next -> prev = i -> prev;
     if(i -> func == goto_printer || i -> func == if_goto_printer) {
-        --*(i -> l -> cnt);
+        --(find(&i -> l) -> cnt);
     }
 }
 
-void add_ir(ir* i) {
-    i->prev = guard.prev;
-    i->next = &guard;
+static inline void add_ir_to_list(ir* i, ir* list_guard) {
+    i->prev = list_guard -> prev;
+    i->next = list_guard;
     i->prev->next = i->next->prev = i;
 }
+void add_ir(ir* i) {
+    add_ir_to_list(i, &guard);
+}
+#ifdef LOCAL
 static inline int output(const char* const fmt, ...) {
     va_list va;
     va_start(va, fmt);
     if(out_file) {
-        vfprintf(out_file, fmt, va);
+        return vfprintf(out_file, fmt, va);
     }
     va_start(va, fmt);
     return vprintf(fmt, va);
 }
+#else
+static inline int output(const char* const fmt, ...) {
+    va_list va;
+    va_start(va, fmt);
+    if(out_file) {
+        return vfprintf(out_file, fmt, va);
+    } else {
+        return vprintf(fmt, va);
+    }
+}
+#endif
 
+void test(ir* i) {
+    i -> func(i);
+    output("\n");
+}
 static void print_operand(operand op) {
     if(op) {
         switch(op -> kind) {
             case ADDRESS:
                 output("*");
-                return print_operand(op -> op);
+                print_operand(op -> op);
+                return;
             case POINTER:
                 Assert(op -> kind == POINTER);
                 output("&");
@@ -85,23 +138,28 @@ void print_ir() {
 label new_label() {
     static unsigned no = 0;
     label ret = new(struct label_);
-    ret -> cnt = new(unsigned);
-    *ret -> cnt = 0;
+    ret -> parent = ret;
+    ret -> cnt = 0;
     ret -> no = ++no;
     return ret;
 }
-static inline void merge_label(label l1, label l2) {
-    l1 -> no = l2 -> no;
-    *(l1 -> cnt) += *(l2 -> cnt);
-    free(l2 -> cnt);
-    l2 -> cnt = l1 -> cnt;
+
+static inline void merge_label(label* lp1, label* lp2) {
+    label l1 = find(lp1);
+    label l2 = find(lp2);
+    if(l1 != l2) {
+        Assert(l1 -> no != l2 -> no);
+        l1 -> parent = l2;
+        l2 -> cnt += l1 -> cnt;
+        l1 -> cnt = 0;
+    }
 }
 
 void print_label_goto(label l) {
     ir* cur_ir = new(ir);
     cur_ir -> func = goto_printer;
     cur_ir -> l = l;
-    ++(*l -> cnt);
+    ++l -> cnt;
     add_ir(cur_ir);
 }
 
@@ -188,13 +246,14 @@ make_printer(arith) {
         print_operand(i -> op2);
     } else {
         operand res = i -> res;
-        operand tmp = new_temp_operand();
-        i -> res = tmp;
+        i -> res = new_temp_operand();
         arith_printer(i);
         output("\n");
         print_operand(res);
         output(" := ");
-        print_operand(tmp);
+        print_operand(i -> res);
+        free(i -> res);
+        i -> res = res;
     }
 }
 void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
@@ -257,6 +316,11 @@ void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
                         if(cons -> val_int == 1) {
                             memcpy(res, other, sizeof(*res));
                             return;
+                        } else if(cons -> val_int == 0) {
+                            set_const_operand(res, 0);
+                            free(op1);
+                            free(op2);
+                            return;
                         }
                         break;
                 }
@@ -300,13 +364,14 @@ make_printer(fun_call) {
         output(" := CALL %s", i -> val_str);
     } else {
         operand res = i -> res;
-        operand tmp = new_temp_operand();
-        i -> res = tmp;
+        i -> res = new_temp_operand();
         fun_call_printer(i);
         output("\n");
         print_operand(res);
         output(" := ");
-        print_operand(tmp);
+        print_operand(i -> res);
+        free(i -> res);
+        i -> res = res;
     }
 }
 void add_fun_call_ir(const char* name, operand op) {
@@ -328,21 +393,38 @@ void add_fun_dec_ir(const char* name) {
 }
 
 make_printer(param) {
-    output("PARAM %s", i -> val_str);
+    output("PARAM ");
+    print_operand(i -> op1);
 }
-void add_param_ir(const char* name) {
+
+static ir params_guard = {
+    .prev = &params_guard,
+    .next = &params_guard,
+    .func = NULL,
+};
+
+void add_param_ir_flush(const char* name) {
+    for(ir *i = params_guard.prev; i != &params_guard;) {
+        ir *prev = i -> prev;
+        remove_ir(i);
+        add_ir(i);
+        i = prev;
+    }
+}
+
+void add_param_ir_buffered(const char* name) {
     ir* i = new(ir);
     i -> func = param_printer;
-    i -> val_str = name;
-    add_ir(i);
+    i -> op1 = new_variable_operand(name);
+    add_ir_to_list(i, &params_guard);
 }
 
 make_printer(label) {
-    output("LABEL l%d :", i -> l -> no);
+    output("LABEL l%d :", find(&i -> l) -> no);
 }
 
 make_printer(goto) { //called by if_nz, if_goto
-    output("GOTO l%d", i -> l -> no);
+    output("GOTO l%d", find(&i -> l) -> no);
 }
 
 make_printer(if_goto) {
@@ -360,7 +442,7 @@ void add_if_goto_ir(operand op1, operand op2, const char* cmp, label l) {
     i -> op2 = op2;
     i -> val_str = cmp;
     i -> l = l;
-    ++(*l -> cnt);
+    ++(l -> cnt);
     add_ir(i);
 }
 void add_if_nz_ir(operand op1, label l) {
@@ -379,13 +461,14 @@ void add_arg_ir(operand op) {
 }
 
 make_printer(dec) {
-    output("DEC r_%s %d\n", i -> val_str, i -> val_int);
-    output("%s := &r_%s", i -> val_str, i -> val_str);
+    output("DEC r_%s %d\n", i -> op1 -> val_str, i -> val_int);
+    print_operand(i -> op1);
+    output(" := &r_%s", i -> op1 -> val_str);
 }
 void add_dec_ir(const char* name ,unsigned size) {
     ir* i = new(ir);
     i -> func = dec_printer;
-    i -> val_str = name;
+    i -> op1 = new_variable_operand(name);
     i -> val_int = size;
     add_ir(i);
 }
@@ -410,8 +493,8 @@ static int dummy_label() { //remove labels that will not be jumped to
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
         if(cur -> func == label_printer) {
-            Assert(*(cur -> l -> cnt) <= 0x3f3f3f3f);
-            if(*(cur -> l -> cnt) == 0) {
+            Assert(cur -> l -> cnt <= 0x3f3f3f3f);
+            if(find(&cur -> l)->cnt == 0) {
                 ret = 1;
                 remove_ir(cur);
             }
@@ -420,38 +503,18 @@ static int dummy_label() { //remove labels that will not be jumped to
     return ret;
 }
 
-/*
-static int dummy_read() {
-    int ret = 0;
-    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur -> func == read_printer) {
-            if(cur -> next -> func == assign_printer) {
-                if(cur -> res == cur -> next -> op1) {
-                    for(ir* other = cur -> next -> next; other != cur; other = other -> next) {
-                        Assert(cur -> res != other -> op1);
-                        Assert(cur -> res != other -> op2);
-                    }
-                    remove_ir(cur);
-                    cur -> next -> func = read_printer;
-                }
-            }
-        }
-    }
-    return ret;
-}
-*/
-__attribute__((unused)) static int dummy_assign() { //remove dummy chain assign
+__attribute__((unused)) static int chain_assign() { //remove dummy chain assign
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
         if(cur -> next -> func == assign_printer) {
-            if(cur -> res == cur -> next -> op1) {
-                for(ir* other = cur -> next -> next; other != cur; other = other -> next) {
-                    Assert(cur -> res != other -> op1);
-                    Assert(cur -> res != other -> op2);
+            if( cur -> res &&
+              ( cur -> res -> kind == TEMP||
+                cur -> res -> kind == CONSTANT)) {
+                if(!opcmp(cur -> res, cur -> next -> op1)) {
+                    ret = 1;
+                    cur -> res = cur -> next -> res;
+                    remove_ir(cur -> next);
                 }
-                ret = 1;
-                cur -> res = cur -> next -> res;
-                remove_ir(cur -> next);
             }
         }
     }
@@ -477,7 +540,7 @@ static int adj_label() { //remove adjacent label
         if(cur -> func == label_printer) {
             if(cur -> next -> func == label_printer) {
                 ret = 1;
-                merge_label(cur -> l, cur -> next -> l);
+                merge_label(&cur -> l, &cur -> next -> l);
                 remove_ir(cur);
             }
         }
@@ -504,6 +567,20 @@ static int stmt_after_return() { //remove statements after return
     return ret;
 }
 
+static int no_write() {
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        if(cur -> func == write_printer) {
+            return 0;
+        }
+    }
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        remove_ir(cur);
+    }
+    add_fun_dec_ir("main");
+    add_return_ir(new_const_operand(0));
+    return 1;
+}
+
 static int template() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
@@ -517,8 +594,7 @@ static struct {
 } optimizers[] = {
     {dummy_goto, 1},
     {dummy_label, 1},
-    //{dummy_read, 1},
-    {dummy_assign, 1},
+    {chain_assign, 1},
     {adj_label, 1},
     {dummy_temp, 1},
     {stmt_after_return, 1},
@@ -527,6 +603,9 @@ static struct {
 
 void tot_optimize() {
     (void)template;
+    if(no_write()) {
+        return;
+    }
     int flag;
     do {
         flag = 0;

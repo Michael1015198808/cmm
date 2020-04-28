@@ -16,8 +16,8 @@ struct tab{
 };
 static unsigned depth;
 
-static tab* table[SIZE] = {};
-static tab* table_tail[SIZE] = {};
+static tab* table[SIZE] = {NULL};
+static tab* table_tail[SIZE] = {NULL};
 
 void init_hash_table() {
     static tab sentries[SIZE];

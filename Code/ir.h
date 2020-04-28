@@ -19,11 +19,11 @@ typedef struct ir_ ir;
 typedef void(*printer)(ir*);
 
 
-struct label_ {
-    unsigned* cnt;
-    unsigned no;
-};
 typedef struct label_* label;
+struct label_ {
+    label parent;
+    unsigned cnt, no;
+};
 
 struct ir_ {
     struct ir_ *prev, *next;
@@ -64,7 +64,8 @@ void add_write_ir(operand op);
 void add_read_ir(operand op);
 void add_fun_call_ir(const char* name, operand op);
 void add_fun_dec_ir(const char* name);
-void add_param_ir(const char* name);
+void add_param_ir_buffered(const char* name);
+void add_param_ir_flush();
 void add_if_goto_ir(operand op1, operand op2, const char* cmp, label l);
 void add_if_nz_ir(operand op1, label l);
 
