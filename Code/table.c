@@ -81,7 +81,7 @@ void free_scope() {
     free_scope_real(1);
 }
 
-static int table_insert_real(const char* name, Type type, unsigned _depth) {
+static int table_insert_real(const char* name, CType type, unsigned _depth) {
     int x = hash(name);
     tab* p = new(tab);
     p -> type = type;
@@ -96,17 +96,17 @@ static int table_insert_real(const char* name, Type type, unsigned _depth) {
 
 static Type table_lookup_all(const char* name, int depth);
 
-int table_insert_struct(const char* name, Type type) {
+int table_insert_struct(const char* name, CType type) {
     if(table_lookup_all(name, 0)) return -1;
     return table_insert_real(name, type, UINT_MAX);
 }
 
-int table_insert_global(const char* name, Type type) {
+int table_insert_global(const char* name, CType type) {
     if(table_lookup_all(name, 0)) return -1;
     return table_insert_real(name, type, 0);
 }
 
-int table_insert(const char* name, Type type) {
+int table_insert(const char* name, CType type) {
     if(table_lookup_all(name, depth)) return -1;
     if(depth > 0) {
         struct LNode* tmp = new(struct LNode);
@@ -189,7 +189,7 @@ static struct struct_dec_list {
     struct struct_dec_list* next;
 } *struct_dec_list_head = NULL;
 
-void add_anonymous_struct(Type ret) {
+void add_anonymous_struct(CType ret) {
     struct struct_dec_list* tmp = new(struct struct_dec_list);
     tmp -> type = ret;
     tmp -> next = struct_dec_list_head;

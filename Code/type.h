@@ -7,14 +7,14 @@
 int strcmp(const char*, const char*);
 
 typedef struct Type_* Type;
-typedef const struct Type_ * const CType;
+typedef const struct Type_ * CType;
 
 typedef LIST_START(FieldList_)
     char* name;
-    Type type;
+    CType type;
 LIST_END *FieldList;
 
-extern CType type_int, type_float;
+extern CType type_int, type_float, type_none;
 
 struct Type_ {
     unsigned size;
@@ -22,10 +22,10 @@ struct Type_ {
     union {
         enum {T_INT, T_FLOAT} basic;
         struct {
-            Type elem;
+            CType elem;
             int size;
         } array;
-        Type variable;
+        CType variable;
         struct {
             //function used this as well
             //return type -> arg1 -> arg2 -> ...
@@ -41,7 +41,7 @@ Type to_struct(int cnt, ...);
 Type to_func(CType ret_val, int cnt, ...);
 
 int typecmp(CType t1, CType t2);
-Type type_check(CType lhs, CType rhs, CType ret, int lineno, semantic_errors err, ...);
+CType type_check(CType lhs, CType rhs, CType ret, int lineno, semantic_errors err, ...);
 
 void type_print(Type t);
 void type_clear(Type t);

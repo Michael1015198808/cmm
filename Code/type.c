@@ -5,15 +5,19 @@
 const static struct Type_ type_int_ = {
     .size = 4,
     .kind = BASIC,
-    .basic = T_INT
+    .basic = T_INT,
 }, type_float_ = {
     .size = 8,
     .kind = BASIC,
-    .basic = T_FLOAT
+    .basic = T_FLOAT,
+}, type_none_ = {
+    .size = 0,
+    .kind = NOTYPE,
 };
 
 CType type_int = &type_int_;
 CType type_float = &type_float_;
+CType type_none = &type_none_;
 
 Type to_array(CType base, unsigned size) {
     Type ret = new(struct Type_);
@@ -136,7 +140,7 @@ int typecmp(CType t1, CType t2) {
     }
 }
 
-Type type_check(CType lhs, CType rhs, CType ret, int lineno, semantic_errors err, ...) {
+CType type_check(CType lhs, CType rhs, CType ret, int lineno, semantic_errors err, ...) {
     va_list ap;
     va_start(ap, err);
 
@@ -147,7 +151,7 @@ Type type_check(CType lhs, CType rhs, CType ret, int lineno, semantic_errors err
         }
         vsemantic_error(lineno, err, ap);
     }
-    return NULL;
+    return type_none;
 }
 
 void static inline type_print_real(Type t, int indent) {

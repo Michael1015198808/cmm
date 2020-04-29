@@ -5,15 +5,15 @@
 #include "ir.h"
 
 #define make_semantic_handler(name) \
-    void* name##_semantic_handler(node* cur)
+    const void* name##_semantic_handler(node* cur)
 
 #define make_arith_handler(name) \
-    void* name##_arith_handler(node* cur, operand res)
+    const void* name##_arith_handler(node* cur, operand res)
 
 #define make_cond_handler(name) \
-    void* name##_cond_handler(node* cur, label l1, label l2)
+    const void* name##_cond_handler(node* cur, label l1, label l2)
 
-void* semantic(node* cur);
+const void* semantic(node* cur);
 
 make_semantic_handler(stmt_exp);
 make_semantic_handler(def);
@@ -47,6 +47,5 @@ make_cond_handler(or);
 make_cond_handler(relop);
 make_cond_handler(not);
 make_cond_handler(int_to_bool);
-
 
 #endif

@@ -26,9 +26,9 @@ int yylineno;
 int yyparse();
 
 typedef struct node node;
-typedef void*(*semantic_handler)(node*);
-typedef void*(*arith_handler)(node*, operand);
-typedef void*(*cond_handler)(node*, label, label);
+typedef const void*(*semantic_handler)(node*);
+typedef const void*(*arith_handler)(node*, operand);
+typedef const void*(*cond_handler)(node*, label, label);
 
 struct node {
     union {

@@ -5,7 +5,7 @@
 #include "table.h"
 #include "optimization.h"
 
-void* semantic(node* cur) { // Most top-level handler. Default handler for statements.
+const void* semantic(node* cur) { // Most top-level handler. Default handler for statements.
     Assert(cur -> kind == STMT);
     if(cur -> semantic) {
         return cur -> semantic(cur);
@@ -18,7 +18,7 @@ void* semantic(node* cur) { // Most top-level handler. Default handler for state
     }
 }
 
-static inline void* arithmatic(node* cur, operand res) {
+static inline const void* arithmatic(node* cur, operand res) {
     if(cur -> kind == ARITH) {
         return cur -> arith(cur, res);
     } else {
@@ -26,7 +26,7 @@ static inline void* arithmatic(node* cur, operand res) {
     }
 }
 
-static inline void* condition(node* cur, label l1, label l2) {
+static inline const void* condition(node* cur, label l1, label l2) {
     if(cur -> kind == COND) {
         return cur -> cond(cur, l1, l2);
     } else {
@@ -41,14 +41,14 @@ char* get_vardec_name(node* cur) {
     return cur -> val_str;
 }
 
-Type cur_def_type = NULL;
+CType cur_def_type = NULL;
 
 make_semantic_handler(stmt_exp) {
     return arithmatic(cur -> siblings[0], NULL);
 }
 
 make_semantic_handler(def) {
-    Type old_def_type = cur_def_type;
+    CType old_def_type = cur_def_type;
     cur_def_type = semantic(cur -> siblings[0]);
     if(cur -> cnt == 3) {
         semantic(cur -> siblings[1]);
@@ -63,9 +63,9 @@ make_semantic_handler(variable) {// cur : VarDec -> ID
 
 make_semantic_handler(array_dec) {// cur : VarDec -> VarDec LB INT RB
     Assert(cur_def_type);
-    Type old_def_type = cur_def_type;
+    CType old_def_type = cur_def_type;
     cur_def_type = to_array(cur_def_type, cur -> siblings[2] -> val_int);
-    Type t = semantic(cur -> siblings[0]);
+    CType t = semantic(cur -> siblings[0]);
     cur_def_type = old_def_type;
     return t;
 }
@@ -84,21 +84,19 @@ make_semantic_handler(vardec) {// cur : Dec -> VarDec
                       // cur : Dec -> VarDec ASSIGNOP Exp
     node* vardec = cur -> siblings[0];
     const char* const name = get_vardec_name(vardec);
-    Type t = semantic(vardec);
-    if(t) {
-        if(table_insert(name, t)) {
-            semantic_error(cur -> lineno, REDEFINE_VARIABLE, name);
-        }
-        if(t -> kind != BASIC) {
-            add_dec_ir(name, t -> size);
-        } else if(cur -> cnt == 3) {
-            operand op1 = new(struct operand_);
-            node* exp = cur -> siblings[2];
-            type_check(t, arithmatic(exp, op1), NULL, exp -> lineno, ASSIGN_MISMATCH);
-            add_assign_ir(new_variable_operand(name), op1);
-        }
+    CType t = semantic(vardec);
+    if(table_insert(name, t)) {
+        semantic_error(cur -> lineno, REDEFINE_VARIABLE, name);
     }
-    return NULL;
+    if(t -> kind != BASIC) {
+        add_dec_ir(name, t -> size);
+    } else if(cur -> cnt == 3) {
+        operand op1 = new(struct operand_);
+        node* exp = cur -> siblings[2];
+        type_check(t, arithmatic(exp, op1), NULL, exp -> lineno, ASSIGN_MISMATCH);
+        add_assign_ir(new_variable_operand(name), op1);
+    }
+    return type_none;
 }
 
 make_semantic_handler(type) {
@@ -149,7 +147,7 @@ static inline Type deflist_to_struct_type(node* cur) {
 
 make_semantic_handler(struct_specifier) {
     cur = cur -> siblings[0];//Specifier to StructSpecifier
-    Type ret = NULL;
+    CType ret = NULL;
     switch(cur -> cnt) {
         case 2:
             if((ret = table_lookup_struct(cur -> siblings[1] -> siblings[0] -> val_str))) {
@@ -159,19 +157,21 @@ make_semantic_handler(struct_specifier) {
             }
             break;
         case 5:
-            ret = new(struct Type_);
-            ret -> kind = STRUCTURE_DEF;
-            new_scope();
-            ret -> variable = deflist_to_struct_type(cur -> siblings[3]);
-            struct_free_scope();
-            if(cur -> siblings[1]) {
-                if(table_insert_struct(cur -> siblings[1] -> siblings[0] -> val_str, ret)) {
-                    semantic_error(cur -> lineno, DUPLICATE_NAME, cur -> siblings[1] -> siblings[0] -> val_str);
+            {
+                Type tmp = new(struct Type_);
+                tmp -> kind = STRUCTURE_DEF;
+                new_scope();
+                tmp -> variable = deflist_to_struct_type(cur -> siblings[3]);
+                struct_free_scope();
+                if(cur -> siblings[1]) {
+                    if(table_insert_struct(cur -> siblings[1] -> siblings[0] -> val_str, tmp)) {
+                        semantic_error(cur -> lineno, DUPLICATE_NAME, cur -> siblings[1] -> siblings[0] -> val_str);
+                    }
+                } else {
+                    add_anonymous_struct(tmp);
                 }
-            } else {
-                add_anonymous_struct(ret);
+                ret = tmp -> variable;
             }
-            ret = ret -> variable;
             break;
         default:
             panic();
@@ -198,7 +198,7 @@ static Type fun_parsing(node* cur, int is_dec) {
             last = last -> next;
             last -> name = get_vardec_name(paramdec -> siblings[1]);
             last -> type = semantic(paramdec -> siblings[1]);
-            Type t = semantic(paramdec -> siblings[1]);
+            CType t = semantic(paramdec -> siblings[1]);
             if(table_insert(last -> name, t)) {
                 semantic_error(paramdec -> lineno, REDEFINE_VARIABLE, last -> name);
             };
@@ -253,7 +253,7 @@ make_semantic_handler(fun_dec) { // cur : ExtDef -> Specifier FunDec CompSt
 }
 
 static void* compst_without_scope(node* );
-static Type cur_fun_ret_type = NULL;
+static CType cur_fun_ret_type = NULL;
 make_semantic_handler(fun_def) { // cur : ExtDef -> Specifier FunDec CompSt
     const char* const fun_name = cur -> siblings[1] -> siblings[0] -> val_str;
     new_scope();
@@ -270,7 +270,7 @@ make_semantic_handler(fun_def) { // cur : ExtDef -> Specifier FunDec CompSt
             semantic_error(cur -> siblings[1] -> siblings[0] -> lineno, REDEFINE_FUNCTION, fun_name);
         }
     }
-    Type old_fun_ret_type = cur_fun_ret_type;
+    CType old_fun_ret_type = cur_fun_ret_type;
     cur_fun_ret_type = t -> structure -> type;
     compst_without_scope(cur -> siblings[2]);
     free_scope();
@@ -291,7 +291,7 @@ make_semantic_handler(return) {// cur : RETURN Exp SEMI
 make_arith_handler(struct_access) {// cur : Exp DOT ID
     node* exp = cur -> siblings[0];
     operand op1;
-    Type t = arithmatic(exp, op1 = new(struct operand_));
+    CType t = arithmatic(exp, op1 = new(struct operand_));
     if(t) {
         if(t -> kind != STRUCTURE) {
             semantic_error(exp -> lineno, ILLEGAL_USE, ".");
@@ -301,12 +301,7 @@ make_arith_handler(struct_access) {// cur : Exp DOT ID
         for(FieldList f = t -> structure;f;f = f -> next) {
             if(!strcmp(f -> name, cur -> siblings[2] -> val_str)) {
                 if(res) {
-                    if(f -> type -> kind == BASIC) {
-                        res -> kind = ADDRESS;
-                        res = (res -> op = new_temp_operand());
-                    } else {
-                        res = set_temp_operand(res);
-                    }
+                    res = set_temp_operand(res);
                     add_arith_ir(res, op1, '+', new_const_operand(offset));
                 }
 
@@ -322,7 +317,7 @@ make_arith_handler(struct_access) {// cur : Exp DOT ID
 make_arith_handler(array_access) {// cur : Exp LB Exp RB
     node* exp1 = cur -> siblings[0];
     operand array_base_address, idx, base_size, offset = new_temp_operand();
-    Type base = arithmatic(exp1, array_base_address = new_temp_operand());
+    CType base = arithmatic(exp1, array_base_address = new_temp_operand());
 
     if(base) {
         if(base -> kind != ARRAY) {
@@ -330,18 +325,13 @@ make_arith_handler(array_access) {// cur : Exp LB Exp RB
             return NULL;
         }
         node* exp2 = cur -> siblings[2];
-        Type index = arithmatic(exp2, idx = new_temp_operand());
+        CType index = arithmatic(exp2, idx = new_temp_operand());
 
         if(res) {
             base_size = new_const_operand(base -> array.elem -> size);
             add_arith_ir(offset, idx, '*', base_size);
 
-            if(base -> array.elem -> kind == BASIC) {
-                res -> kind = ADDRESS;
-                res = (res -> op = new_temp_operand());
-            } else {
-                res = set_temp_operand(res);
-            }
+            res = set_temp_operand(res);
             add_arith_ir(res, offset, '+', array_base_address);
         }
 
@@ -355,12 +345,16 @@ make_arith_handler(assign) { //cur : Exp -> Exp ASSIGNOP Exp
     if(!res) {
         res = new(struct operand_);
     }
-    Type rhs = arithmatic(cur -> siblings[2], op2 = new(struct operand_));
+    CType rhs = arithmatic(cur -> siblings[2], op2 = new(struct operand_));
     if(OPTIMIZE(ARITH_CONSTANT) && op2 -> kind == CONSTANT) {
         set_const_operand(res, op2 -> val_int);
         res = new(struct operand_);
     }
-    Type lhs = arithmatic(cur -> siblings[0], res);
+    CType lhs = arithmatic(cur -> siblings[0], res);
+    if(lhs -> kind == BASIC) {
+        res -> kind = ADDRESS;
+        res = (res -> op = new_temp_operand());
+    } else {
     IF(res -> kind != VARIABLE && res -> kind != ADDRESS) {
         semantic_error(cur -> siblings[0] -> lineno, LVALUE);
         return NULL;
