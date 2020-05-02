@@ -440,16 +440,17 @@ make_arith_handler(fun_call) {// cur : ID LP Args RP
         semantic_error(fun -> lineno,      NOT_FUNCTION, fun -> val_str);
         return NULL;
     }
+    if(res) {
+        set_temp_operand(res);
+    } else {
+        res = new_temp_operand();
+    }
     if(!strcmp(fun -> val_str, "write")) {
         operand op;
         arithmatic(cur -> siblings[2] -> siblings[0], op = new(struct operand_));
         add_write_ir(op);
+        set_const_operand(res, 0);
     } else if(!strcmp(fun -> val_str, "read")) {
-        if(res) {
-            set_temp_operand(res);
-        } else {
-            res = new_temp_operand();
-        }
         add_read_ir(res);
     } else {
         if(cur -> cnt == 4) {
@@ -477,11 +478,6 @@ make_arith_handler(fun_call) {// cur : ID LP Args RP
             if(func -> structure -> next) {
                 semantic_error(fun -> lineno, FUNCTION_MISMATCH, fun -> val_str);
             }
-        }
-        if(res) {
-            set_temp_operand(res);
-        } else {
-            res = new_temp_operand();
         }
         add_fun_call_ir(fun -> val_str, res);
     }

@@ -548,10 +548,10 @@ static int adj_label() { //remove adjacent label
     return ret;
 }
 
-static int stmt_after_return() { //remove statements after return
+static int stmt_after_flow() { //remove statements after a flow
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur -> func == return_printer) {
+        if(cur -> func == return_printer || cur -> func == goto_printer) {
             for(ir* i = cur -> next; i != &guard; i = i -> next) {
                 if(i -> func == label_printer) {
                     break;
@@ -597,7 +597,7 @@ static struct {
     {chain_assign, 1},
     {adj_label, 1},
     {dummy_temp, 1},
-    {stmt_after_return, 1},
+    {stmt_after_flow, 1},
     {NULL, 0},
 };
 
