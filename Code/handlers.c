@@ -199,9 +199,10 @@ static Type fun_parsing(node* cur, int is_dec) {
             last -> name = get_vardec_name(paramdec -> siblings[1]);
             last -> type = semantic(paramdec -> siblings[1]);
             Type t = semantic(paramdec -> siblings[1]);
+            cur_def_type = NULL;
             if(table_insert(last -> name, t)) {
                 semantic_error(paramdec -> lineno, REDEFINE_VARIABLE, last -> name);
-            };
+            }
             add_param_ir_buffered(last -> name);
             if(varlist -> cnt == 1) {
                 break;
@@ -365,7 +366,28 @@ make_arith_handler(assign) { //cur : Exp -> Exp ASSIGNOP Exp
         semantic_error(cur -> siblings[0] -> lineno, LVALUE);
         return NULL;
     }
-    add_assign_ir(res, op2);
+    if(rhs -> kind == BASIC) {
+        add_assign_ir(res, op2);
+    } else {
+        // cur : Stmt -> WHILE LP Exp RP Stmt
+        label start = new_label(),
+              end   = new_label();
+        operand loop_variable = new_temp_operand();
+        operand r_ptr = new(struct operand_);
+        operand l_ptr = new(struct operand_);
+        l_ptr -> kind = r_ptr -> kind = ADDRESS;
+        add_assign_ir(l_ptr -> op = new_temp_operand(), res);
+        add_assign_ir(r_ptr -> op = new_temp_operand(), op2);
+              
+        print_label(start); //start:
+        add_assign_ir(l_ptr, r_ptr);//assign
+        add_arith_ir(loop_variable, loop_variable, '+', new_const_operand(1));
+        add_arith_ir(r_ptr -> op, r_ptr -> op, '+', new_const_operand(4));
+        add_arith_ir(l_ptr -> op, l_ptr -> op, '+', new_const_operand(4));
+        add_if_goto_ir(loop_variable, new_const_operand(rhs -> size / 4), ">=", end); //if temp > goto end
+        print_label_goto(start); //goto start
+        print_label(end); //end:
+    }
     return type_check(lhs, rhs, NULL, cur -> siblings[0] -> lineno, ASSIGN_MISMATCH);
 }
 
