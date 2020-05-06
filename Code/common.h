@@ -13,6 +13,8 @@
 
 #define new(type) (type*)memset(malloc(sizeof(type)), 0, sizeof(type))
 
+#define min(a, b) ((a)<(b)?(a):(b))
+
 static inline void* free_first(void* ptr1, void* ptr2) {
     free(ptr1);
     return ptr2;

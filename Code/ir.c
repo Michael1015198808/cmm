@@ -64,8 +64,9 @@ static inline void add_ir_to_list(ir* i, ir* list_guard) {
     i->next = list_guard;
     i->prev->next = i->next->prev = i;
 }
-void add_ir(ir* i) {
+static void* add_ir(ir* i) {
     add_ir_to_list(i, &guard);
+    return i;
 }
 #ifdef LOCAL
 static inline int output(const char* const fmt, ...) {
@@ -229,12 +230,12 @@ make_printer(assign) {
     output(" := ");
     print_operand(i -> op1);
 }
-void add_assign_ir(operand to, operand from) {
+void* add_assign_ir(operand to, operand from) {
     ir* i = new(ir);
     i -> func = assign_printer;
     i -> res = to;
     i -> op1 = from;
-    add_ir(i);
+    return add_ir(i);
 }
 
 make_printer(arith) {
@@ -521,6 +522,20 @@ __attribute__((unused)) static int chain_assign() { //remove dummy chain assign
     return ret;
 }
 
+static int chain_goto() { //remove chain goto
+    int ret = 0;
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        if(cur -> func == label_printer) {
+            if(cur -> next -> func == goto_printer) {
+                ret = 1;
+                merge_label(&cur -> l, &cur -> next -> l);
+                remove_ir(cur);
+            }
+        }
+    }
+    return ret;
+}
+
 static int dummy_temp() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
@@ -567,20 +582,6 @@ static int stmt_after_flow() { //remove statements after a flow
     return ret;
 }
 
-static int no_write() {
-    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur -> func == write_printer) {
-            return 0;
-        }
-    }
-    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        remove_ir(cur);
-    }
-    add_fun_dec_ir("main");
-    add_return_ir(new_const_operand(0));
-    return 1;
-}
-
 static int template() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
@@ -595,6 +596,7 @@ static struct {
     {dummy_goto, 1},
     {dummy_label, 1},
     {chain_assign, 1},
+    {chain_goto, 1},
     {adj_label, 1},
     {dummy_temp, 1},
     {stmt_after_flow, 1},
@@ -603,9 +605,6 @@ static struct {
 
 void tot_optimize() {
     (void)template;
-    if(no_write()) {
-        return;
-    }
     int flag;
     do {
         flag = 0;

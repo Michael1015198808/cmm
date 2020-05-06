@@ -362,10 +362,12 @@ make_arith_handler(assign) { //cur : Exp -> Exp ASSIGNOP Exp
         res = new(struct operand_);
     }
     Type lhs = arithmatic(cur -> siblings[0], res);
+    /*
     IF(res -> kind != VARIABLE && res -> kind != ADDRESS) {
         semantic_error(cur -> siblings[0] -> lineno, LVALUE);
         return NULL;
     }
+    */
     if(rhs -> kind == BASIC) {
         add_assign_ir(res, op2);
     } else {
@@ -384,7 +386,7 @@ make_arith_handler(assign) { //cur : Exp -> Exp ASSIGNOP Exp
         add_arith_ir(loop_variable, loop_variable, '+', new_const_operand(1));
         add_arith_ir(r_ptr -> op, r_ptr -> op, '+', new_const_operand(4));
         add_arith_ir(l_ptr -> op, l_ptr -> op, '+', new_const_operand(4));
-        add_if_goto_ir(loop_variable, new_const_operand(rhs -> size / 4), ">=", end); //if temp > goto end
+        add_if_goto_ir(loop_variable, new_const_operand(min(lhs->size, rhs -> size) / 4), ">=", end); //if temp > goto end
         print_label_goto(start); //goto start
         print_label(end); //end:
     }
@@ -403,6 +405,23 @@ make_arith_handler(id) { //cur : Exp -> ID
     }
     return t;
 }
+static inline int revert(int op) {
+    switch(op) {
+        case '+':
+            return '-';
+        case '-':
+            return '+';
+        default:
+            Assert(0);
+            return 0;
+    }
+}
+static inline int uminus_cnt(node* cur, int cnt) {
+    if(cur -> arith == uminus_arith_handler) {
+        return uminus_cnt(cur -> siblings[1], cnt + 1);
+    }
+    return cnt;
+}
 
 make_arith_handler(arith) {
     operand op1 = NULL, op2 = NULL;
@@ -411,9 +430,19 @@ make_arith_handler(arith) {
         op2 = new(struct operand_);
     }
     Type lhs = arithmatic(cur -> siblings[0], op1);
-    Type rhs = arithmatic(cur -> siblings[2], op2);
-    if(res) {
-        add_arith_ir(set_temp_operand(res), op1, cur -> val_int, op2);
+    Type rhs;
+    if(OPTIMIZE(A_PLUS_NEG_B) &&
+            (cur -> val_int == '+' || cur -> val_int == '-') &&
+            uminus_cnt(cur->siblings[2], 0) & 1) {
+        rhs = arithmatic(cur -> siblings[2] -> siblings[1], op2);
+        if(res) {
+            add_arith_ir(set_temp_operand(res), op1, revert(cur->val_int), op2);
+        }
+    } else {
+        rhs = arithmatic(cur -> siblings[2], op2);
+        if(res) {
+            add_arith_ir(set_temp_operand(res), op1, cur -> val_int, op2);
+        }
     }
     return type_check(lhs, rhs, NULL, cur -> siblings[0] -> lineno, OPERAND_MISMATCH);
 }
@@ -422,11 +451,22 @@ make_arith_handler(bool_to_int) {
     if(res) {
         label ctrue  = new_label();
         label cfalse = new_label();
-        add_assign_ir(set_temp_operand(res), new_const_operand(0));
+        ir* assign_zero = add_assign_ir(set_temp_operand(res), new_const_operand(0));
         void* ret = condition(cur, ctrue, cfalse);
-        print_label(ctrue);
-        add_assign_ir(res, new_const_operand(1));
-        print_label(cfalse);
+        if(ctrue -> cnt && cfalse-> cnt) {
+            print_label(ctrue);
+            add_assign_ir(res, new_const_operand(1));
+            print_label(cfalse);
+        } else {
+            remove_ir(assign_zero);
+            if(ctrue->cnt == 0) {
+                set_const_operand(res, 0);
+                print_label(cfalse);
+            } else {
+                set_const_operand(res, 1);
+                print_label(ctrue);
+            }
+        }
         return ret;
     } else {
         label next = new_label();
@@ -438,8 +478,7 @@ make_arith_handler(bool_to_int) {
 
 make_arith_handler(int) {
     if(res) {
-        res -> kind = CONSTANT;
-        res -> val_int = cur -> siblings[0] -> val_int;
+        set_const_operand(res, cur -> siblings[0] -> val_int);
     }
     return (void*)type_int;
 }
@@ -524,9 +563,14 @@ make_semantic_handler(compst) {
 
 
 make_arith_handler(uminus) {
+    if(OPTIMIZE(DUAL_UMINUS) && cur -> siblings[1] -> arith == uminus_arith_handler) {
+        return arithmatic(cur -> siblings[1] -> siblings[1], res);
+    }
     operand op1;
     void* ret = arithmatic(cur -> siblings[1], op1 = new_temp_operand());
-    add_arith_ir(set_temp_operand(res), new_const_operand(0), '-', op1);
+    if(res) {
+        add_arith_ir(set_temp_operand(res), new_const_operand(0), '-', op1);
+    }
     return ret;
 }
 
