@@ -325,6 +325,9 @@ void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
                         }
                         break;
                 }
+            } else if(!opcmp(op1, op2) && arith_op == '/') {
+                set_const_operand(res, 1);
+                return;
             }
         }
     }
@@ -474,12 +477,15 @@ void add_dec_ir(const char* name ,unsigned size) {
     add_ir(i);
 }
 
-static int dummy_goto() { //remove goto next line
+//remove goto next line
+//goto l2
+//LABEL l2:
+static int dummy_goto() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
         if(cur -> func == goto_printer) {
             if(cur -> next -> func == label_printer) {
-                if(cur -> l == cur -> next -> l) {
+                if(find(&cur -> l) == find(&cur -> next -> l)) {
                     ret = 1;
                     remove_ir(cur);
                 }
@@ -522,7 +528,12 @@ __attribute__((unused)) static int chain_assign() { //remove dummy chain assign
     return ret;
 }
 
-static int chain_goto() { //remove chain goto
+//remove chain goto
+//GOTO l2
+//...
+//LABEL l2:
+//GOTO l3
+static int chain_goto() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
         if(cur -> func == label_printer) {
@@ -563,7 +574,9 @@ static int adj_label() { //remove adjacent label
     return ret;
 }
 
-static int stmt_after_flow() { //remove statements after a flow
+//remove unreachable statements
+//e.g., statements after RETURN, GOTO
+static int remove_unreachable() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
         if(cur -> func == return_printer || cur -> func == goto_printer) {
@@ -582,6 +595,41 @@ static int stmt_after_flow() { //remove statements after a flow
     return ret;
 }
 
+char* revert_relop(const char* relop) {
+    switch(relop[0]) {
+        case '!':
+            return "==";
+        case '=':
+            return "!=";
+        case '<':
+            return relop[1] == '='?">":">=";
+        case '>':
+            return relop[1] == '='?"<":"<=";
+        default:
+            Assert(0);
+    }
+    return NULL;
+}
+
+static int redundant_goto() {
+    int ret = 0;
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        if(cur->func == if_goto_printer &&
+                cur->next->func == goto_printer &&
+                cur->next->next->func == label_printer) {
+            if(find(&cur->l)->no == find(&cur->next->next->l)->no) {
+                ret = 1;
+                --cur->l->cnt;
+                cur->val_str = revert_relop(cur->val_str);
+                cur->l = find(&cur->next->l);
+                ++cur->l->cnt;
+                remove_ir(cur->next);
+            }
+        }
+    }
+    return ret;
+}
+
 static int template() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
@@ -594,12 +642,13 @@ static struct {
     int level;
 } optimizers[] = {
     {dummy_goto, 1},
+    {redundant_goto, 1}, //dragon book 6.6.5
     {dummy_label, 1},
     {chain_assign, 1},
-    {chain_goto, 1},
+    {chain_goto, 1}, //dragon book 8.7.3
     {adj_label, 1},
     {dummy_temp, 1},
-    {stmt_after_flow, 1},
+    {remove_unreachable, 1}, //dragon book 8.7.2
     {NULL, 0},
 };
 

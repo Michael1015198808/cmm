@@ -52,7 +52,7 @@ struct node {
 extern node* root;
 
 static inline node* Node(const char* name,int lineno, int cnt, ...) {
-    node* ret = (node*)malloc(sizeof(node));
+    node* ret = new(node);
     ret -> kind = STMT;
     ret -> semantic = NULL;
     ret -> name = name;
