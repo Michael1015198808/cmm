@@ -12,7 +12,8 @@ struct operand_ {
         const char* val_str;
         operand op;
     };
-    enum {VARIABLE, CONSTANT, ADDRESS, POINTER, TEMP, SPECIAL, DUMMY} kind;
+    unsigned bool_to_int:1;
+    enum {VARIABLE, CONSTANT, ADDRESS, POINTER, TEMP, DUMMY} kind;
 };
 
 typedef struct ir_ ir;
@@ -58,6 +59,9 @@ operand set_const_operand(operand, int num);
 
 operand new_variable_operand(const char*);
 operand set_variable_operand(operand, const char*);
+
+operand new_address_operand(operand);
+operand set_address_operand(operand, operand);
 
 operand new_dummy_operand(void);
 operand set_dummy_operand(operand);

@@ -25,7 +25,6 @@ int opcmp(operand op1, operand op2) {
                 case VARIABLE:
                     return strcmp(op1->val_str, op2->val_str);
                 case TEMP:
-                case SPECIAL:
                     return op1->t_no!=op2->t_no;
                 case ADDRESS:
                     return opcmp(op1->op, op2->op);
@@ -88,7 +87,9 @@ static inline int output(const char* const fmt, ...) {
     va_list va;
     va_start(va, fmt);
     if(out_file) {
-        return vfprintf(out_file, fmt, va);
+        int ret = vfprintf(out_file, fmt, va);
+        fflush(out_file);
+        return ret;
     }
     va_start(va, fmt);
     return vprintf(fmt, va);
@@ -126,7 +127,6 @@ static void print_operand(operand op) {
                 output("%s", op -> val_str);
                 break;
             case TEMP:
-            case SPECIAL:
                 output("t%d", op -> t_no);
                 break;
             case CONSTANT:
@@ -211,6 +211,17 @@ operand set_const_operand(operand op, int num) {
 operand new_variable_operand(const char* const name) {
     operand ret = new(struct operand_);
     return set_variable_operand(ret, name);
+}
+
+operand new_address_operand(operand op) {
+    operand ret = new(struct operand_);
+    return set_address_operand(ret, op);
+}
+
+operand set_address_operand(operand op, operand op2) {
+    op -> kind = ADDRESS;
+    op -> op = op2;
+    return op;
 }
 
 operand set_variable_operand(operand op, const char* const name) {
@@ -481,9 +492,12 @@ void add_arg_ir(operand op) {
 }
 
 make_printer(dec) {
-    output("DEC r_%s %d\n", i -> op1 -> val_str, i -> val_int);
+    output("DEC r_");
     print_operand(i -> op1);
-    output(" := &r_%s", i -> op1 -> val_str);
+    output(" %d\n",  i -> val_int);
+    print_operand(i -> op1);
+    output(" := &r_");
+    print_operand(i -> op1);
 }
 void add_dec_ir(const char* name ,unsigned size) {
     ir* i = new(ir);
@@ -526,17 +540,31 @@ static int dummy_label() { //remove labels that will not be jumped to
     return ret;
 }
 
-__attribute__((unused)) static int chain_assign() { //remove dummy chain assign
+//remove chain assign
+//t1 := exp1 op exp2
+//t2 := t1
+//  or
+//t1 := exp1
+//t2 := t1 op exp2
+__attribute__((unused)) static int chain_assign() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur -> next -> func == assign_printer) {
-            if( cur -> res &&
-              ( cur -> res -> kind == TEMP||
-                cur -> res -> kind == CONSTANT)) {
+        if(cur->res &&
+          ( cur -> res -> kind == TEMP||
+            cur -> res -> kind == CONSTANT)) {
+            if(cur -> next -> func == assign_printer) {
                 if(!opcmp(cur -> res, cur -> next -> op1)) {
                     ret = 1;
                     cur -> res = cur -> next -> res;
                     remove_ir(cur -> next);
+                }
+            } else if(cur->func == assign_printer) {
+                for(int i = 0; i < 2; ++i) {
+                    if(!opcmp(cur -> res, cur -> next -> ops[i])) {
+                        ret = 1;
+                        cur->next->ops[i] = cur -> op1;
+                        remove_ir(cur);
+                    }
                 }
             }
         }
@@ -657,28 +685,46 @@ static inline ir* find_func(const char* name) {
 }
 
 LIST_START(map)
-    operand key, val;
+    operand key_v;
+    label key_l;
+    void *val;
 LIST_END;
+
 static operand inline_op_copy(operand origin, struct map* map) {
     if(origin -> kind == CONSTANT) {
-        return origin;
+        return new_const_operand(origin->val_int);
     }
-    if(origin -> kind == ADDRESS) {
-        Assert(0);
-    }
-    while(map && opcmp(map->key, origin)) {
+    while(map) {
+        if(map->key_v && !opcmp(map->key_v, origin)) {
+            return map->val;
+        }
         map = map->next;
     }
-    if(map) {
-        return map->val;
-    } else {
-        return NULL;
-    }
+    return NULL;
 }
 
-static struct map* map_insert(struct map* head, struct map* tail, operand key, operand val) {
+static label inline_label_copy(label origin, struct map* map) {
+    while(map) {
+        if(map->key_l && (find(&map->key_l) -> no == find(&origin)->no)) {
+            return map->val;
+        }
+        map = map->next;
+    }
+    return NULL;
+}
+
+static struct map* map_insert_v(struct map* head, struct map* tail, operand key, operand val) {
     head->next = tail;
-    head->key  = key;
+    head->key_v= key;
+    head->key_l= NULL;
+    head->val  = val;
+    return head;
+}
+
+static struct map* map_insert_l(struct map* head, struct map* tail, label key, label val) {
+    head->next = tail;
+    head->key_v= NULL;
+    head->key_l= key;
     head->val  = val;
     return head;
 }
@@ -688,7 +734,7 @@ static void do_inline(ir* end, const char* fun_name) {
     struct map* map = NULL;
     operand ret_val_res = end->res;
     ir* args = end->prev;
-    //label func_end;
+    label func_end = new_label();
     for(ir *callee = find_func(fun_name) -> next;
             callee->func != fun_dec_printer;
             callee = callee->next) {
@@ -697,29 +743,63 @@ static void do_inline(ir* end, const char* fun_name) {
             while(args->func != arg_printer) {
                 args = args->prev;
             }
-            map = map_insert(alloca(sizeof(struct map)), map, callee->op1, args->op1);
+            if(args->op1->kind == ADDRESS) {
+                ir* i = new(ir);
+                i -> func = assign_printer;
+                i -> res = new_temp_operand();
+                i -> op1 = args->op1;
+                add_ir_before(i, end);
+                args->op1 = i->res;
+            }
+            map = map_insert_v(alloca(sizeof(struct map)), map, callee->op1, args->op1);
             remove_ir(args);
             args = args->prev;
             continue;
         }
+        memcpy(copyed, callee, sizeof(*callee));
+        add_ir_before(copyed, end);
         if(callee->func == return_printer) {
             copyed->func = assign_printer;
             copyed->res  = ret_val_res;
             copyed->op1  = inline_op_copy(callee->op1, map);
-            add_ir_before(copyed, end);
+            ir* cur_ir = new(ir);
+            cur_ir -> func = goto_printer;
+            cur_ir -> l = func_end;
+            ++func_end -> cnt;
+            add_ir_before(cur_ir, end);
         } else {
-            memcpy(copyed, callee, sizeof(*callee));
             for(int i = 0; i < 3; ++i) {
                 if(copyed -> ops[i]) {
-                    if(!(copyed->ops[i] = inline_op_copy(copyed->ops[i], map))) {
-                        copyed->ops[i] = new_temp_operand();
-                        map = map_insert(alloca(sizeof(struct map)), map,
+                    if(!(copyed->ops[i] = inline_op_copy(callee->ops[i], map))) {
+                        if(callee->ops[i]->kind == ADDRESS) {
+                            copyed->ops[i] = new_address_operand(inline_op_copy(callee->ops[i]->op, map));
+                            Assert(copyed->ops[i]->op);
+                        } else {
+                            copyed->ops[i] = new_temp_operand();
+                        }
+                        map = map_insert_v(alloca(sizeof(struct map)), map,
                                 callee->ops[i], copyed->ops[i]);
                     }
                 }
             }
-            add_ir_before(copyed, end);
+            if(copyed->l) {
+                if(!(copyed->l = inline_label_copy(callee->l, map))) {
+                    copyed->l = new_label();
+                    map = map_insert_l(alloca(sizeof(struct map)), map,
+                            callee->l, copyed->l);
+                }
+                ++(find(&copyed->l)->cnt);
+            }
+            if(copyed->func == fun_call_printer) {
+                copyed->val_int = 1;
+            }
         }
+    }
+    {
+        ir* cur_ir = new(ir);
+        cur_ir -> func = label_printer;
+        cur_ir -> l = func_end;
+        add_ir_before(cur_ir, end);
     }
     remove_ir(end);
 }
@@ -729,12 +809,49 @@ static int function_inline() {
         if(cur->func == fun_dec_printer) {
             cur_fun_name = cur->val_str;
         }
-        if(cur->func == fun_call_printer && strcmp(cur->val_str, "main") && strcmp(cur->val_str, cur_fun_name)) {
-            do_inline(cur, cur->val_str);
-            return 1;
+        if(cur->func == fun_call_printer && cur->val_int == 0 &&
+                strcmp(cur->val_str, "main") && strcmp(cur->val_str, cur_fun_name)) {
+            int i = 0;
+            for(ir *callee = find_func(cur->val_str) -> next; callee->func != fun_dec_printer; callee = callee->next, ++i);
+            if(i < 7) {
+                do_inline(cur, cur->val_str);
+                return 1;
+            } else {
+                cur->val_int = 1;
+            }
         }
     }
     return 0;
+}
+
+static int const_eliminate() {
+    int ret = 0;
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        if(cur->func == assign_printer) {
+            if(cur->op1->kind == CONSTANT && cur->res->kind == TEMP && !cur->res->bool_to_int) {
+                ret = 1;
+                remove_ir(cur);
+                set_const_operand(cur->res, cur->op1->val_int);
+            }
+        } else if(cur->func == arith_printer) {
+            if( cur->op1->kind == CONSTANT && 
+                cur->op2->kind == CONSTANT &&
+                cur->res->kind == TEMP &&
+                !cur->res->bool_to_int) {
+                ret = 1;
+                remove_ir(cur);
+                add_arith_ir(cur->res, cur->op1, cur->val_int, cur->op2);
+            }
+        }
+    }
+    return ret;
+}
+
+static int adj_arith() {
+    int ret = 0;
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+    }
+    return ret;
 }
 
 static int template() {
@@ -754,9 +871,11 @@ static struct {
     {chain_assign, 1},
     {chain_goto, 1}, //dragon book 8.7.3
     {adj_label, 1},
+    {adj_arith, 999},
+    {const_eliminate, 1},
     {dummy_temp, 1},
     {remove_unreachable, 1}, //dragon book 8.7.2
-    {function_inline, 2},
+    {function_inline, 1},
     {NULL, 0},
 };
 
@@ -780,6 +899,7 @@ static inline int op_include(operand op1, operand op2) {
     }
     return 0;
 }
+
 static void check_dummy(operand op, ir* start, ir* cur, ir* end) {
     if(!op)return;
     for(ir *i = cur->next; i != end->next && i != &guard; i = i->next) {
@@ -798,6 +918,7 @@ static void check_dummy(operand op, ir* start, ir* cur, ir* end) {
         check_dummy(cur->op2, start, op2_assign, cur->prev);
     }
 }
+
 void dummy_assign(ir* start, ir* end) {
     for(ir *i = start; i != end; i = i->next) {
         if(i->func == assign_printer ||
