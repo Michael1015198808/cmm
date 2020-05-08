@@ -6,13 +6,13 @@
 
 typedef struct operand_ *operand;
 struct operand_ {
-    enum {VARIABLE, CONSTANT, ADDRESS, POINTER, TEMP, DUMMY} kind;
     union {
         int t_no;
         int val_int;
         const char* val_str;
         operand op;
     };
+    enum {VARIABLE, CONSTANT, ADDRESS, POINTER, TEMP, SPECIAL, DUMMY} kind;
 };
 
 typedef struct ir_ ir;
@@ -28,7 +28,12 @@ struct label_ {
 struct ir_ {
     struct ir_ *prev, *next;
     printer func;
-    operand op1, op2, res;
+    union {
+        struct {
+            operand op1, op2, res;
+        };
+        operand ops[3];
+    };
     label l;
     const char* val_str;
     unsigned int val_int;
@@ -37,6 +42,7 @@ struct ir_ {
 
 
 void print_ir();
+const ir* last_ir();
 
 label new_label(void);
 void label_add_true(label, operand);
@@ -73,4 +79,11 @@ void  add_arg_ir(operand op);
 void  add_dec_ir(const char* name, unsigned size);
 
 void tot_optimize();
+void dummy_assign(ir* start, ir* end);
+
+#define make_printer(name) \
+    void name##_printer(ir* i)
+
+make_printer(return);
+
 #endif //__IR_H__

@@ -254,7 +254,7 @@ make_semantic_handler(fun_dec) { // cur : ExtDef -> Specifier FunDec CompSt
 }
 
 static void* compst_without_scope(node* );
-static Type cur_fun_ret_type = NULL;
+Type cur_fun_type = NULL;
 make_semantic_handler(fun_def) { // cur : ExtDef -> Specifier FunDec CompSt
     const char* const fun_name = cur -> siblings[1] -> siblings[0] -> val_str;
     new_scope();
@@ -271,19 +271,26 @@ make_semantic_handler(fun_def) { // cur : ExtDef -> Specifier FunDec CompSt
             semantic_error(cur -> siblings[1] -> siblings[0] -> lineno, REDEFINE_FUNCTION, fun_name);
         }
     }
-    Type old_fun_ret_type = cur_fun_ret_type;
-    cur_fun_ret_type = t -> structure -> type;
+    Type old_fun_type = cur_fun_type;
+    cur_fun_type = t;
     compst_without_scope(cur -> siblings[2]);
+    /*
+    if(last_ir()->func != return_printer) {
+        add_return_ir(new_const_operand(114514));
+    }
+    */
     free_scope();
-    cur_fun_ret_type = old_fun_ret_type;
+    Assert(cur_fun_type->has_read == 0);
+    Assert(cur_fun_type->has_goto == 0);
+    cur_fun_type = old_fun_type;
     return NULL;
 }
 
 make_semantic_handler(return) {// cur : RETURN Exp SEMI
-    Assert(cur_fun_ret_type);
+    Assert(cur_fun_type -> structure->type);
     node* exp = cur -> siblings[1];
     operand op1 = NULL;
-    type_check(cur_fun_ret_type, arithmatic(exp, op1 = new(struct operand_)), NULL,
+    type_check(cur_fun_type->structure->type, arithmatic(exp, op1 = new(struct operand_)), NULL,
             exp -> lineno, RETURN_MISMATCH);
     add_return_ir(op1);
     return NULL;

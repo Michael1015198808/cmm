@@ -9,8 +9,6 @@ static ir guard = {
     .func = NULL,
 };
 
-#define make_printer(name) \
-    void name##_printer(ir* i)
 
 make_printer(label);
 make_printer(goto);
@@ -27,6 +25,7 @@ int opcmp(operand op1, operand op2) {
                 case VARIABLE:
                     return strcmp(op1->val_str, op2->val_str);
                 case TEMP:
+                case SPECIAL:
                     return op1->t_no!=op2->t_no;
                 case ADDRESS:
                     return opcmp(op1->op, op2->op);
@@ -51,7 +50,22 @@ static inline label find(label* lp) {
     }
 }
 
+const ir* last_ir() {
+    return guard.prev;
+}
+static inline void list_check(ir* i) {
+    Assert(i == i->prev->next);
+    Assert(i == i->next->prev);
+}
+static inline void whole_check() {
+    for(ir* i = guard.next; i != &guard; i = i->next) {
+        list_check(i);
+    }
+}
+
 void remove_ir(ir* i) {
+    Assert(i != &guard);
+    list_check(i);
     i -> prev -> next = i -> next;
     i -> next -> prev = i -> prev;
     if(i -> func == goto_printer || i -> func == if_goto_printer) {
@@ -59,13 +73,14 @@ void remove_ir(ir* i) {
     }
 }
 
-static inline void add_ir_to_list(ir* i, ir* list_guard) {
+static inline void add_ir_before(ir* i, ir* list_guard) {
+    list_check(list_guard);
     i->prev = list_guard -> prev;
     i->next = list_guard;
     i->prev->next = i->next->prev = i;
 }
 static void* add_ir(ir* i) {
-    add_ir_to_list(i, &guard);
+    add_ir_before(i, &guard);
     return i;
 }
 #ifdef LOCAL
@@ -111,6 +126,7 @@ static void print_operand(operand op) {
                 output("%s", op -> val_str);
                 break;
             case TEMP:
+            case SPECIAL:
                 output("t%d", op -> t_no);
                 break;
             case CONSTANT:
@@ -420,7 +436,7 @@ void add_param_ir_buffered(const char* name) {
     ir* i = new(ir);
     i -> func = param_printer;
     i -> op1 = new_variable_operand(name);
-    add_ir_to_list(i, &params_guard);
+    add_ir_before(i, &params_guard);
 }
 
 make_printer(label) {
@@ -629,6 +645,97 @@ static int redundant_goto() {
     }
     return ret;
 }
+static inline ir* find_func(const char* name) {
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        if(cur->func == fun_dec_printer) {
+            if(!strcmp(cur->val_str, name)) {
+                return cur;
+            }
+        }
+    }
+    return NULL;
+}
+
+LIST_START(map)
+    operand key, val;
+LIST_END;
+static operand inline_op_copy(operand origin, struct map* map) {
+    if(origin -> kind == CONSTANT) {
+        return origin;
+    }
+    if(origin -> kind == ADDRESS) {
+        Assert(0);
+    }
+    while(map && opcmp(map->key, origin)) {
+        map = map->next;
+    }
+    if(map) {
+        return map->val;
+    } else {
+        return NULL;
+    }
+}
+
+static struct map* map_insert(struct map* head, struct map* tail, operand key, operand val) {
+    head->next = tail;
+    head->key  = key;
+    head->val  = val;
+    return head;
+}
+
+#include <alloca.h>
+static void do_inline(ir* end, const char* fun_name) {
+    struct map* map = NULL;
+    operand ret_val_res = end->res;
+    ir* args = end->prev;
+    //label func_end;
+    for(ir *callee = find_func(fun_name) -> next;
+            callee->func != fun_dec_printer;
+            callee = callee->next) {
+        ir* copyed = new(ir);
+        if(callee->func == param_printer) {
+            while(args->func != arg_printer) {
+                args = args->prev;
+            }
+            map = map_insert(alloca(sizeof(struct map)), map, callee->op1, args->op1);
+            remove_ir(args);
+            args = args->prev;
+            continue;
+        }
+        if(callee->func == return_printer) {
+            copyed->func = assign_printer;
+            copyed->res  = ret_val_res;
+            copyed->op1  = inline_op_copy(callee->op1, map);
+            add_ir_before(copyed, end);
+        } else {
+            memcpy(copyed, callee, sizeof(*callee));
+            for(int i = 0; i < 3; ++i) {
+                if(copyed -> ops[i]) {
+                    if(!(copyed->ops[i] = inline_op_copy(copyed->ops[i], map))) {
+                        copyed->ops[i] = new_temp_operand();
+                        map = map_insert(alloca(sizeof(struct map)), map,
+                                callee->ops[i], copyed->ops[i]);
+                    }
+                }
+            }
+            add_ir_before(copyed, end);
+        }
+    }
+    remove_ir(end);
+}
+static int function_inline() {
+    const char* cur_fun_name = NULL;
+    for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        if(cur->func == fun_dec_printer) {
+            cur_fun_name = cur->val_str;
+        }
+        if(cur->func == fun_call_printer && strcmp(cur->val_str, "main") && strcmp(cur->val_str, cur_fun_name)) {
+            do_inline(cur, cur->val_str);
+            return 1;
+        }
+    }
+    return 0;
+}
 
 static int template() {
     int ret = 0;
@@ -649,8 +756,57 @@ static struct {
     {adj_label, 1},
     {dummy_temp, 1},
     {remove_unreachable, 1}, //dragon book 8.7.2
+    {function_inline, 2},
     {NULL, 0},
 };
+
+static inline ir* find_assign(operand op, ir* cur) {
+    while(cur != &guard) {
+        if(opcmp(cur->res, op)) {
+            cur = cur->prev;
+        } else {
+            return cur;
+        }
+    }
+    return NULL;
+}
+static inline int op_include(operand op1, operand op2) {
+    if(op1) {
+        if(op1->kind==ADDRESS) {
+            return !opcmp(op1->op, op2);
+        } else if(op1->kind==TEMP) {
+            return !opcmp(op1, op2);
+        }
+    }
+    return 0;
+}
+static void check_dummy(operand op, ir* start, ir* cur, ir* end) {
+    if(!op)return;
+    for(ir *i = cur->next; i != end->next && i != &guard; i = i->next) {
+        if(op_include(i->op1, op) || op_include(i->op2, op) ||
+                (i->res && i->res->kind == ADDRESS && !opcmp(i->res->op, op))) {
+            return;
+        }
+    }
+    remove_ir(cur);
+    ir *op1_assign = find_assign(cur->op1, cur->prev);
+    if(op1_assign) {
+        check_dummy(cur->op1, start, op1_assign, cur->prev);
+    }
+    ir *op2_assign = find_assign(cur->op2, cur->prev);
+    if(op2_assign) {
+        check_dummy(cur->op2, start, op2_assign, cur->prev);
+    }
+}
+void dummy_assign(ir* start, ir* end) {
+    for(ir *i = start; i != end; i = i->next) {
+        if(i->func == assign_printer ||
+                i->func == arith_printer) {
+            if(i->res->kind==TEMP)
+                check_dummy(i->res, start, i, end);
+        }
+    }
+}
 
 void tot_optimize() {
     (void)template;
@@ -658,6 +814,7 @@ void tot_optimize() {
     do {
         flag = 0;
         for(int i = 0; optimizers[i].func; ++i) {
+            whole_check();
             if(OPTIMIZE(optimizers[i].level))
                 flag |= optimizers[i].func();
         }
