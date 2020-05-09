@@ -461,7 +461,7 @@ make_arith_handler(bool_to_int) {
         ir* assign_zero = add_assign_ir(set_temp_operand(res), new_const_operand(0));
         void* ret = condition(cur, ctrue, cfalse);
         if(ctrue -> cnt && cfalse-> cnt) {
-            res -> bool_to_int = 1;
+            res -> multi_use = 1;
             print_label(ctrue);
             add_assign_ir(res, new_const_operand(1));
             print_label(cfalse);

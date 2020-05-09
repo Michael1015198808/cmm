@@ -550,7 +550,7 @@ __attribute__((unused)) static int chain_assign() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
         if(cur->res &&
-          ( cur -> res -> kind == TEMP||
+          (( cur -> res -> kind == TEMP && !cur->res->multi_use)||
             cur -> res -> kind == CONSTANT)) {
             if(cur -> next -> func == assign_printer) {
                 if(!opcmp(cur -> res, cur -> next -> op1)) {
@@ -559,12 +559,16 @@ __attribute__((unused)) static int chain_assign() {
                     remove_ir(cur -> next);
                 }
             } else if(cur->func == assign_printer) {
+                int flag = 0;
                 for(int i = 0; i < 2; ++i) {
                     if(!opcmp(cur -> res, cur -> next -> ops[i])) {
-                        ret = 1;
+                        flag = 1;
                         cur->next->ops[i] = cur -> op1;
-                        remove_ir(cur);
                     }
+                }
+                if(flag) {
+                    ret = 1;
+                    remove_ir(cur);
                 }
             }
         }
@@ -694,6 +698,9 @@ static operand inline_op_copy(operand origin, struct map* map) {
     if(origin -> kind == CONSTANT) {
         return new_const_operand(origin->val_int);
     }
+    if(origin->kind == ADDRESS) {
+        return new_address_operand(inline_op_copy(origin->op, map));
+    }
     while(map) {
         if(map->key_v && !opcmp(map->key_v, origin)) {
             return map->val;
@@ -730,9 +737,12 @@ static struct map* map_insert_l(struct map* head, struct map* tail, label key, l
 }
 
 #include <alloca.h>
-static void do_inline(ir* end, const char* fun_name) {
+static int do_inline(ir* end, const char* fun_name) {
+    static int cnt = 0;
+    if(++cnt > 25) return 0;
     struct map* map = NULL;
     operand ret_val_res = end->res;
+    ret_val_res->multi_use = 1;
     ir* args = end->prev;
     label func_end = new_label();
     for(ir *callee = find_func(fun_name) -> next;
@@ -743,10 +753,11 @@ static void do_inline(ir* end, const char* fun_name) {
             while(args->func != arg_printer) {
                 args = args->prev;
             }
-            if(args->op1->kind == ADDRESS) {
+            {
                 ir* i = new(ir);
                 i -> func = assign_printer;
                 i -> res = new_temp_operand();
+                i -> res -> multi_use = 1;
                 i -> op1 = args->op1;
                 add_ir_before(i, end);
                 args->op1 = i->res;
@@ -776,6 +787,7 @@ static void do_inline(ir* end, const char* fun_name) {
                             Assert(copyed->ops[i]->op);
                         } else {
                             copyed->ops[i] = new_temp_operand();
+                            copyed->ops[i]->multi_use = (callee->ops[i]->kind != TEMP || callee->ops[i]->multi_use);
                         }
                         map = map_insert_v(alloca(sizeof(struct map)), map,
                                 callee->ops[i], copyed->ops[i]);
@@ -802,6 +814,7 @@ static void do_inline(ir* end, const char* fun_name) {
         add_ir_before(cur_ir, end);
     }
     remove_ir(end);
+    return 1;
 }
 static int function_inline() {
     const char* cur_fun_name = NULL;
@@ -812,10 +825,9 @@ static int function_inline() {
         if(cur->func == fun_call_printer && cur->val_int == 0 &&
                 strcmp(cur->val_str, "main") && strcmp(cur->val_str, cur_fun_name)) {
             int i = 0;
-            for(ir *callee = find_func(cur->val_str) -> next; callee->func != fun_dec_printer; callee = callee->next, ++i);
+            //for(ir *callee = find_func(cur->val_str) -> next; callee->func != fun_dec_printer; callee = callee->next, ++i);
             if(i < 7) {
-                do_inline(cur, cur->val_str);
-                return 1;
+                return do_inline(cur, cur->val_str);
             } else {
                 cur->val_int = 1;
             }
@@ -828,19 +840,22 @@ static int const_eliminate() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
         if(cur->func == assign_printer) {
-            if(cur->op1->kind == CONSTANT && cur->res->kind == TEMP && !cur->res->bool_to_int) {
-                ret = 1;
-                remove_ir(cur);
-                set_const_operand(cur->res, cur->op1->val_int);
+            if(cur->op1->kind == CONSTANT) {
+                if(cur->res->kind == TEMP && !cur->res->multi_use) {
+                    remove_ir(cur);
+                    ret = 1;
+                    set_const_operand(cur->res, cur->op1->val_int);
+                }
             }
         } else if(cur->func == arith_printer) {
             if( cur->op1->kind == CONSTANT && 
-                cur->op2->kind == CONSTANT &&
-                cur->res->kind == TEMP &&
-                !cur->res->bool_to_int) {
-                ret = 1;
-                remove_ir(cur);
-                add_arith_ir(cur->res, cur->op1, cur->val_int, cur->op2);
+                cur->op2->kind == CONSTANT ) {
+                if(cur->res->kind == TEMP &&
+                    !cur->res->multi_use) {
+                    ret = 1;
+                    remove_ir(cur);
+                    add_arith_ir(cur->res, cur->op1, cur->val_int, cur->op2);
+                }
             }
         }
     }

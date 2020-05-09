@@ -12,7 +12,7 @@ struct operand_ {
         const char* val_str;
         operand op;
     };
-    unsigned bool_to_int:1;
+    unsigned multi_use:1;
     enum {VARIABLE, CONSTANT, ADDRESS, POINTER, TEMP, DUMMY} kind;
 };
 
