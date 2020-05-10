@@ -64,6 +64,9 @@ void new_scope() {
 static inline void free_scope_real(int to_free) {
     for(struct LNode* cur = cur_list -> dec; cur; cur = remove_access(cur, next)) {
         tab* to_rm = cur -> pre -> next;
+        if(!to_rm -> type -> r_val) {
+            remove_unused_variable(to_rm->name);
+        }
         if(to_rm -> next == NULL) {
             table_tail[hash(to_rm -> name)] = cur -> pre;
         }

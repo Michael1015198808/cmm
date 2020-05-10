@@ -20,7 +20,10 @@ struct Type_ {
     unsigned size;
     enum {BASIC, ARRAY, STRUCTURE, STRUCTURE_DEF, FUNCTION, NOTYPE} kind;
     union {
-        enum {T_INT, T_FLOAT} basic;
+        struct {
+            enum {T_INT, T_FLOAT} basic;
+            unsigned r_val:1;
+        };
         struct {
             Type elem;
             int size;

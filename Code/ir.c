@@ -760,6 +760,16 @@ static struct {
     {NULL, 0},
 };
 
+void remove_unused_variable(const char *name) {
+    operand op = new_variable_operand(name);
+    for(ir* i = guard.next; i != &guard; i = i -> next) {
+        if(!opcmp(i->res, op)) {
+            remove_ir(i);
+        }
+    }
+    free(op);
+}
+
 static inline ir* find_assign(operand op, ir* cur) {
     while(cur != &guard) {
         if(opcmp(cur->res, op)) {

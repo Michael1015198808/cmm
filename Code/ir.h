@@ -86,4 +86,5 @@ void dummy_assign(ir* start, ir* end);
 
 make_printer(return);
 
+void remove_unused_variable(const char*);
 #endif //__IR_H__

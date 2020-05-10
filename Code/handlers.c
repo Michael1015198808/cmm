@@ -43,6 +43,7 @@ char* get_vardec_name(node* cur) {
 
 Type cur_def_type = NULL;
 
+static int r_mode = 1;
 make_semantic_handler(stmt_exp) {
     return arithmatic(cur -> siblings[0], NULL);
 }
@@ -50,9 +51,11 @@ make_semantic_handler(stmt_exp) {
 make_semantic_handler(def) {
     Type old_def_type = cur_def_type;
     cur_def_type = semantic(cur -> siblings[0]);
+    r_mode = 0;
     if(cur -> cnt == 3) {
         semantic(cur -> siblings[1]);
     }
+    r_mode = 1;
     cur_def_type = old_def_type;
     return NULL;
 }
@@ -189,6 +192,7 @@ static Type fun_parsing(node* cur, int is_dec) {
     ret -> structure -> type = semantic(cur -> siblings[0]);
 
     FieldList last = ret -> structure;
+    r_mode = 0;
     if(cur -> siblings[1] -> cnt == 4) {
         for(node* varlist = cur -> siblings[1] -> siblings[2]; ;varlist = varlist -> siblings[2]) {
             node* paramdec = varlist -> siblings[0];
@@ -209,6 +213,7 @@ static Type fun_parsing(node* cur, int is_dec) {
             }
         }
     }
+    r_mode = 1;
     add_param_ir_flush();
     last -> next = NULL;
     return ret;
@@ -368,7 +373,9 @@ make_arith_handler(assign) { //cur : Exp -> Exp ASSIGNOP Exp
         set_const_operand(res, op2 -> val_int);
         res = new(struct operand_);
     }
+    r_mode = 0;
     Type lhs = arithmatic(cur -> siblings[0], res);
+    r_mode = 1;
     /*
     IF(res -> kind != VARIABLE && res -> kind != ADDRESS) {
         semantic_error(cur -> siblings[0] -> lineno, LVALUE);
@@ -406,6 +413,8 @@ make_arith_handler(id) { //cur : Exp -> ID
     if(!t) {
         semantic_error(id -> lineno, UNDEFINE_VARIABLE, id -> val_str);
     }
+    if(r_mode)
+        t->r_val = 1;
     if(res) {
         res -> kind = VARIABLE;
         res -> val_str = id -> val_str;
