@@ -260,19 +260,22 @@ make_printer(arith) {
 void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
     if(OPTIMIZE(ARITH_CONSTANT)) {
         if(op1 -> kind == CONSTANT && op2 -> kind == CONSTANT) {
-            res -> kind = CONSTANT;
             switch(arith_op) {
                 case '+':
-                    res -> val_int = op1 -> val_int + op2 -> val_int;
+                    set_const_operand(res, op1 -> val_int + op2 -> val_int);
                     break;
                 case '-':
-                    res -> val_int = op1 -> val_int - op2 -> val_int;
+                    set_const_operand(res, op1 -> val_int - op2 -> val_int);
                     break;
                 case '*':
-                    res -> val_int = op1 -> val_int * op2 -> val_int;
+                    set_const_operand(res, op1 -> val_int * op2 -> val_int);
                     break;
                 case '/':
-                    res -> val_int = op1 -> val_int / op2 -> val_int;
+                    if(op2 -> val_int == 0) {
+                        set_const_operand(res, 0);
+                    } else {
+                        set_const_operand(res, op1 -> val_int / op2 -> val_int);
+                    }
                     break;
             }
             free(op1);
@@ -303,12 +306,12 @@ void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
                         }
                         break;
                     case '/':
+                        if(cons -> val_int == 0) {
+                            set_const_operand(res, 0);
+                            return;
+                        }
                         if(cons == op1) {
                             //cons / other
-                            if(cons -> val_int == 0) {
-                                set_const_operand(res, 0);
-                                return;
-                            }
                             break;
                         }
                         //other / cons
@@ -325,9 +328,14 @@ void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
                         }
                         break;
                 }
-            } else if(!opcmp(op1, op2) && arith_op == '/') {
-                set_const_operand(res, 1);
-                return;
+            } else if(!opcmp(op1, op2)) {
+                if(arith_op == '/') {
+                    set_const_operand(res, 1);
+                    return;
+                } else if(arith_op == '-') {
+                    set_const_operand(res, 0);
+                    return;
+                }
             }
         }
     }
