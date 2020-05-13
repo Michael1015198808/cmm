@@ -284,7 +284,7 @@ make_printer(arith) {
         i -> res = res;
     }
 }
-void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
+static inline int opt_arith(operand res, operand op1, int arith_op, operand op2) {
     if(OPTIMIZE(ARITH_CONSTANT)) {
         if(op1 -> kind == CONSTANT && op2 -> kind == CONSTANT) {
             res -> kind = CONSTANT;
@@ -302,9 +302,7 @@ void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
                     res -> val_int = op1 -> val_int / op2 -> val_int;
                     break;
             }
-            free(op1);
-            free(op2);
-            return;
+            return 1;
         } else {
             operand cons = NULL, other = NULL;
             if(op1 -> kind == CONSTANT) {
@@ -326,7 +324,7 @@ void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
                         //other + cons or cons + other
                         if(cons -> val_int == 0) {
                             memcpy(res, other, sizeof(*res));
-                            return;
+                            return 1;
                         }
                         break;
                     case '/':
@@ -334,7 +332,7 @@ void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
                             //cons / other
                             if(cons -> val_int == 0) {
                                 set_const_operand(res, 0);
-                                return;
+                                return 1;
                             }
                             break;
                         }
@@ -343,20 +341,25 @@ void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
                         //other * cons or cons * other
                         if(cons -> val_int == 1) {
                             memcpy(res, other, sizeof(*res));
-                            return;
+                            return 1;
                         } else if(cons -> val_int == 0) {
                             set_const_operand(res, 0);
-                            free(op1);
-                            free(op2);
-                            return;
+                            return 1;
                         }
                         break;
                 }
             } else if(!opcmp(op1, op2) && arith_op == '/') {
                 set_const_operand(res, 1);
-                return;
+                return 1;
             }
         }
+    }
+    return 0;
+}
+
+void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
+    if(opt_arith(res, op1, arith_op, op2)) {
+        return;
     }
     ir* i = new(ir);
     i -> func = arith_printer;
@@ -598,10 +601,11 @@ static int chain_goto() {
 static int dummy_temp() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur -> res) {
-            if(cur -> res -> kind == DUMMY) {
-                ret = 1;
-                remove_ir(cur);
+        if(cur -> res -> kind == TEMP) {
+            for(ir* i = cur; i != &guard; i = i -> next) {
+                if((!opcmp(i->op1, cur->res)) || (!opcmp(i->op2, cur->res))) {
+                    break;
+                }
             }
         }
     }
@@ -836,6 +840,27 @@ static int function_inline() {
     return 0;
 }
 
+static int replace_op(ir* start, operand from, operand to) {
+    int ret = 0;
+    for(ir *i = start;; i = i->next) {
+        if(i->func==label_printer || i->func == goto_printer || i->func == return_printer) {
+            break;
+        }
+        if(!opcmp(i->op1, from)) {
+            ret = 1;
+            i->op1 = to;
+        }
+        if(!opcmp(i->op2, from)) {
+            ret = 1;
+            i->op2 = to;
+        }
+        if(!opcmp(i->res, from)) {
+            break;
+        }
+    }
+    return ret;
+}
+
 static int const_eliminate() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
@@ -844,8 +869,8 @@ static int const_eliminate() {
                 if(cur->res->kind == TEMP && !cur->res->multi_use) {
                     remove_ir(cur);
                     ret = 1;
-                    set_const_operand(cur->res, cur->op1->val_int);
                 }
+                ret |= replace_op(cur->next, cur->res, cur->op1);
             }
         } else if(cur->func == arith_printer) {
             if( cur->op1->kind == CONSTANT && 
@@ -854,8 +879,9 @@ static int const_eliminate() {
                     !cur->res->multi_use) {
                     ret = 1;
                     remove_ir(cur);
-                    add_arith_ir(cur->res, cur->op1, cur->val_int, cur->op2);
+                    Assert(opt_arith(cur->res, cur->op1, cur->val_int, cur->op2));
                 }
+                //ret |= replace_op(cur->next, cur->res, opted);
             }
         }
     }
