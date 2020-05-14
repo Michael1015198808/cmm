@@ -598,14 +598,36 @@ static int chain_goto() {
     return ret;
 }
 
+static inline int op_include(operand op1, operand op2) {
+    if(op1) {
+        if(op1->kind==ADDRESS) {
+            return !opcmp(op1->op, op2);
+        } else if(op1->kind==TEMP) {
+            return !opcmp(op1, op2);
+        }
+    }
+    return 0;
+}
+
+static inline int check_used(operand op, ir* i) {
+    for(;i->func != fun_dec_printer; i=i->next) {
+        if((op_include(i->op1, op)) ||
+           (op_include(i->op2, op)) ||
+           (op_include(i->res, op))) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static int dummy_temp() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur -> res -> kind == TEMP) {
-            for(ir* i = cur; i != &guard; i = i -> next) {
-                if((!opcmp(i->op1, cur->res)) || (!opcmp(i->op2, cur->res))) {
-                    break;
-                }
+        if(cur->func != fun_call_printer && cur->res && cur ->res-> kind == TEMP && cur->res->checked == 0) {
+            cur->res->checked = 1;
+            if(!check_used(cur->res, cur->next)) {
+                ret = 1;
+                remove_ir(cur);
             }
         }
     }
@@ -743,7 +765,7 @@ static struct map* map_insert_l(struct map* head, struct map* tail, label key, l
 #include <alloca.h>
 static int do_inline(ir* end, const char* fun_name) {
     static int cnt = 0;
-    if(++cnt > 25) return 0;
+    if(++cnt > 10) return 0;
     struct map* map = NULL;
     operand ret_val_res = end->res;
     ret_val_res->multi_use = 1;
@@ -843,9 +865,6 @@ static int function_inline() {
 static int replace_op(ir* start, operand from, operand to) {
     int ret = 0;
     for(ir *i = start;; i = i->next) {
-        if(i->func==label_printer || i->func == goto_printer || i->func == return_printer) {
-            break;
-        }
         if(!opcmp(i->op1, from)) {
             ret = 1;
             i->op1 = to;
@@ -854,7 +873,7 @@ static int replace_op(ir* start, operand from, operand to) {
             ret = 1;
             i->op2 = to;
         }
-        if(!opcmp(i->res, from)) {
+        if(!opcmp(i->res, from) || i->func==label_printer || i->func == goto_printer || i->func == return_printer) {
             break;
         }
     }
@@ -865,7 +884,8 @@ static int const_eliminate() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
         if(cur->func == assign_printer) {
-            if(cur->op1->kind == CONSTANT) {
+            if(cur->op1->kind == CONSTANT && cur->res->kind != ADDRESS) {
+                cur->res->checked = 0;
                 if(cur->res->kind == TEMP && !cur->res->multi_use) {
                     remove_ir(cur);
                     ret = 1;
@@ -874,14 +894,18 @@ static int const_eliminate() {
             }
         } else if(cur->func == arith_printer) {
             if( cur->op1->kind == CONSTANT && 
-                cur->op2->kind == CONSTANT ) {
+                cur->op2->kind == CONSTANT &&
+                cur->res->kind != ADDRESS) {
+                cur->res->checked = 0;
+                operand opted = new(struct operand_);
+                opt_arith(opted, cur->op1, cur->val_int, cur->op2);
+                ret |= replace_op(cur->next, cur->res, opted);
                 if(cur->res->kind == TEMP &&
                     !cur->res->multi_use) {
                     ret = 1;
                     remove_ir(cur);
                     Assert(opt_arith(cur->res, cur->op1, cur->val_int, cur->op2));
                 }
-                //ret |= replace_op(cur->next, cur->res, opted);
             }
         }
     }
@@ -914,8 +938,8 @@ static struct {
     {adj_label, 1},
     {adj_arith, 999},
     {const_eliminate, 1},
-    {dummy_temp, 1},
     {remove_unreachable, 1}, //dragon book 8.7.2
+    {dummy_temp, 1},
     {function_inline, 1},
     {NULL, 0},
 };
@@ -929,16 +953,6 @@ static inline ir* find_assign(operand op, ir* cur) {
         }
     }
     return NULL;
-}
-static inline int op_include(operand op1, operand op2) {
-    if(op1) {
-        if(op1->kind==ADDRESS) {
-            return !opcmp(op1->op, op2);
-        } else if(op1->kind==TEMP) {
-            return !opcmp(op1, op2);
-        }
-    }
-    return 0;
 }
 
 static void check_dummy(operand op, ir* start, ir* cur, ir* end) {
