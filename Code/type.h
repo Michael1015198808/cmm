@@ -30,7 +30,7 @@ struct Type_ {
             //function used this as well
             //return type -> arg1 -> arg2 -> ...
             FieldList structure;
-            int is_dec;
+            int is_dec:1, has_read:1, has_goto:1;
         };
     };
 };

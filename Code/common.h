@@ -101,7 +101,10 @@ static inline node* Singleton(const char* name) {
 
 #else
 #define TODO(...)
-#define Assert(...)
+#define Assert(cond) \
+    do { \
+        cond; \
+    } while(0)
 #define panic(...)
 #define IF(cond) \
     if((cond) && 0)
