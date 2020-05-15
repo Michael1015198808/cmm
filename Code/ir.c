@@ -391,7 +391,16 @@ void add_write_ir(operand op) {
 
 make_printer(read) {
     output("READ ");
-    print_operand(i -> res);
+    if(i->res->kind == ADDRESS) {
+        operand tmp = new_temp_operand();
+        print_operand(tmp);
+        output("\n");
+        print_operand(i -> res);
+        output(" := ");
+        print_operand(tmp);
+    } else {
+        print_operand(i -> res);
+    }
 }
 void add_read_ir(operand op) {
     ir* i = new(ir);
