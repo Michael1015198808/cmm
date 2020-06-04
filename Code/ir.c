@@ -4,9 +4,9 @@
 void* memcpy(void*, const void*, size_t);
 
 static ir guard = {
-    .prev = &guard,
-    .next = &guard,
-    .func = NULL,
+        .prev = &guard,
+        .next = &guard,
+        .func = NULL,
 };
 
 
@@ -106,10 +106,6 @@ static inline int output(const char* const fmt, ...) {
 }
 #endif
 
-void test(ir* i) {
-    i -> func(i);
-    output("\n");
-}
 static void print_operand(operand op) {
     if(op) {
         switch(op -> kind) {
@@ -449,9 +445,9 @@ make_printer(param) {
 }
 
 static ir params_guard = {
-    .prev = &params_guard,
-    .next = &params_guard,
-    .func = NULL,
+        .prev = &params_guard,
+        .next = &params_guard,
+        .func = NULL,
 };
 
 void add_param_ir_flush(const char* name) {
@@ -570,7 +566,7 @@ __attribute__((unused)) static int chain_assign() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
         if(cur->res &&
-          (( cur -> res -> kind == TEMP && !cur->res->multi_use)||
+           (( cur -> res -> kind == TEMP && !cur->res->multi_use)||
             cur -> res -> kind == CONSTANT)) {
             if(cur -> next -> func == assign_printer) {
                 if(!opcmp(cur -> res, cur -> next -> op1)) {
@@ -706,8 +702,8 @@ static int redundant_goto() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
         if(cur->func == if_goto_printer &&
-                cur->next->func == goto_printer &&
-                cur->next->next->func == label_printer) {
+           cur->next->func == goto_printer &&
+           cur->next->next->func == label_printer) {
             if(find(&cur->l)->no == find(&cur->next->next->l)->no) {
                 ret = 1;
                 --cur->l->cnt;
@@ -738,6 +734,7 @@ LIST_START(map)
 LIST_END;
 
 static operand inline_op_copy(operand origin, struct map* map) {
+    if(origin == NULL) return NULL;
     if(origin -> kind == CONSTANT) {
         return new_const_operand(origin->val_int);
     }
@@ -789,8 +786,8 @@ static int do_inline(ir* end, const char* fun_name) {
     ir* args = end->prev;
     label func_end = new_label();
     for(ir *callee = find_func(fun_name) -> next;
-            callee->func != fun_dec_printer;
-            callee = callee->next) {
+        callee->func != fun_dec_printer;
+        callee = callee->next) {
         ir* copyed = new(ir);
         if(callee->func == param_printer) {
             while(args->func != arg_printer) {
@@ -833,7 +830,7 @@ static int do_inline(ir* end, const char* fun_name) {
                             copyed->ops[i]->multi_use = (callee->ops[i]->kind != TEMP || callee->ops[i]->multi_use);
                         }
                         map = map_insert_v(alloca(sizeof(struct map)), map,
-                                callee->ops[i], copyed->ops[i]);
+                                           callee->ops[i], copyed->ops[i]);
                     }
                 }
             }
@@ -841,7 +838,7 @@ static int do_inline(ir* end, const char* fun_name) {
                 if(!(copyed->l = inline_label_copy(callee->l, map))) {
                     copyed->l = new_label();
                     map = map_insert_l(alloca(sizeof(struct map)), map,
-                            callee->l, copyed->l);
+                                       callee->l, copyed->l);
                 }
                 ++(find(&copyed->l)->cnt);
             }
@@ -864,16 +861,10 @@ static int function_inline() {
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
         if(cur->func == fun_dec_printer) {
             cur_fun_name = cur->val_str;
-        }
+        } else
         if(cur->func == fun_call_printer && cur->val_int == 0 &&
-                strcmp(cur->val_str, "main") && strcmp(cur->val_str, cur_fun_name)) {
-            int i = 0;
-            //for(ir *callee = find_func(cur->val_str) -> next; callee->func != fun_dec_printer; callee = callee->next, ++i);
-            if(i < 7) {
-                return do_inline(cur, cur->val_str);
-            } else {
-                cur->val_int = 1;
-            }
+           strcmp(cur->val_str, "main") && strcmp(cur->val_str, cur_fun_name)) {
+            return do_inline(cur, cur->val_str);
         }
     }
     return 0;
@@ -910,7 +901,7 @@ static int const_eliminate() {
                 ret |= replace_op(cur->next, cur->res, cur->op1);
             }
         } else if(cur->func == arith_printer) {
-            if( cur->op1->kind == CONSTANT && 
+            if( cur->op1->kind == CONSTANT &&
                 cur->op2->kind == CONSTANT &&
                 cur->res->kind != ADDRESS) {
                 cur->res->checked = 0;
@@ -918,7 +909,7 @@ static int const_eliminate() {
                 opt_arith(opted, cur->op1, cur->val_int, cur->op2);
                 ret |= replace_op(cur->next, cur->res, opted);
                 if(cur->res->kind == TEMP &&
-                    !cur->res->multi_use) {
+                   !cur->res->multi_use) {
                     ret = 1;
                     remove_ir(cur);
                     Assert(opt_arith(cur->res, cur->op1, cur->val_int, cur->op2));
@@ -947,18 +938,17 @@ static struct {
     int (*func)(void);
     int level;
 } optimizers[] = {
-    {dummy_goto, 1},
-    {redundant_goto, 1}, //dragon book 6.6.5
-    {dummy_label, 1},
-    {chain_assign, 1},
-    {chain_goto, 1}, //dragon book 8.7.3
-    {adj_label, 1},
-    {adj_arith, 999},
-    {const_eliminate, 1},
-    {remove_unreachable, 1}, //dragon book 8.7.2
-    {dummy_temp, 1},
-    {function_inline, 1},
-    {NULL, 0},
+        {dummy_goto, 1},
+        {redundant_goto, 1}, //dragon book 6.6.5
+        {dummy_label, 1},
+        {chain_assign, 1},
+        {chain_goto, 1}, //dragon book 8.7.3
+        {adj_label, 1},
+        {adj_arith, 999},
+        {const_eliminate, 1},
+        {remove_unreachable, 1}, //dragon book 8.7.2
+        {dummy_temp, 1},
+        {NULL, 0},
 };
 
 static inline ir* find_assign(operand op, ir* cur) {
@@ -976,7 +966,7 @@ static void check_dummy(operand op, ir* start, ir* cur, ir* end) {
     if(!op)return;
     for(ir *i = cur->next; i != end->next && i != &guard; i = i->next) {
         if(op_include(i->op1, op) || op_include(i->op2, op) ||
-                (i->res && i->res->kind == ADDRESS && !opcmp(i->res->op, op))) {
+           (i->res && i->res->kind == ADDRESS && !opcmp(i->res->op, op))) {
             return;
         }
     }
@@ -994,7 +984,7 @@ static void check_dummy(operand op, ir* start, ir* cur, ir* end) {
 void dummy_assign(ir* start, ir* end) {
     for(ir *i = start; i != end; i = i->next) {
         if(i->func == assign_printer ||
-                i->func == arith_printer) {
+           i->func == arith_printer) {
             if(i->res->kind==TEMP)
                 check_dummy(i->res, start, i, end);
         }
@@ -1011,5 +1001,5 @@ void tot_optimize() {
             if(OPTIMIZE(optimizers[i].level))
                 flag |= optimizers[i].func();
         }
-    } while(flag);
+    } while(flag || (OPTIMIZE(2) && function_inline()));
 }
