@@ -52,17 +52,7 @@ gdb: parser
 	@gdb parser
 #一键测试../Test目录下所有.cmm文件的输出是否和.out一致
 test: parser
-	@for case in $(TEST_CASE); \
-	do \
-		./parser $$case.cmm > temp.out; \
-		if diff temp.out $$case.out >/dev/null; \
-			then echo PASS $$case; \
-			else echo Wrong on $$case;\
-		fi; \
-		rm temp.out; \
-	done;
-#生成../Test目录下所有.cmm文件对应的.out，以备日后make test
-gen: parser $(TEST_OUT)
+	@cd ~/compilers-tests && ./my.sh
 
 ../Test/%.out : ../Test/%.cmm parser
 	./parser $< > $@
@@ -76,5 +66,6 @@ runall: parser $(TEST_OUT)
 		cat $$case.out; \
 	done;
 run: parser
-	@./parser ../Test/temp.cmm
+	@./parser ../Test/lab4-1.cmm tmp/a.s
+	@spim -file tmp/a.s
 	@#./parser ~/compilers-tests/tests/yzy1.cmm ~/repos/irsim/mine.ir

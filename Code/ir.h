@@ -25,10 +25,13 @@ struct label_ {
     label parent;
     unsigned cnt, no;
 };
+typedef struct {
+    printer ir_format, mips_format;
+} ir_ops;
 
 struct ir_ {
     struct ir_ *prev, *next;
-    printer func;
+    ir_ops* funcs;
     union {
         struct {
             operand op1, op2, res;
@@ -43,6 +46,7 @@ struct ir_ {
 
 
 void print_ir();
+void print_code();
 const ir* last_ir();
 
 label new_label(void);
@@ -85,9 +89,20 @@ void  add_dec_ir(const char* name, unsigned size);
 void tot_optimize();
 void dummy_assign(ir* start, ir* end);
 
-#define make_printer(name) \
-    void name##_printer(ir* i)
+#define make_ir_ops(name) \
+    void name##_ir_printer(ir* i); \
+    void name##_mips_printer(ir* i); \
+    static ir_ops name##_ops_real = { \
+        .ir_format = name##_ir_printer, \
+        .mips_format = name##_mips_printer \
+    }, *name##_ops = &name##_ops_real
 
-make_printer(return);
+#define make_ir_printer(name) \
+    void name##_ir_printer(ir* i)
+
+#define make_mips_printer(name) \
+    void name##_mips_printer(ir* i)
+
+make_ir_printer(return);
 
 #endif //__IR_H__

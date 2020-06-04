@@ -6,13 +6,10 @@ void* memcpy(void*, const void*, size_t);
 static ir guard = {
         .prev = &guard,
         .next = &guard,
-        .func = NULL,
+        .funcs = NULL,
 };
 
-
-make_printer(label);
-make_printer(goto);
-make_printer(if_goto);
+static ir_ops *if_goto_ops, *goto_ops, *label_ops;
 
 extern FILE* const out_file;
 int opcmp(operand op1, operand op2) {
@@ -67,7 +64,7 @@ void remove_ir(ir* i) {
     list_check(i);
     i -> prev -> next = i -> next;
     i -> next -> prev = i -> prev;
-    if(i -> func == goto_printer || i -> func == if_goto_printer) {
+    if(i -> funcs == goto_ops || i -> funcs == if_goto_ops) {
         --(find(&i -> l) -> cnt);
     }
 }
@@ -139,8 +136,8 @@ static void print_operand(operand op) {
 void print_ir() {
     for(ir* i = guard.next; i != &guard; i = i -> next) {
         //printf("%p\n", i);
-        if(i -> func) {
-            i -> func(i);
+        if(i -> funcs) {
+            i -> funcs -> ir_format(i);
             output("\n");
         } else {
             panic();
@@ -170,7 +167,7 @@ static inline void merge_label(label* lp1, label* lp2) {
 
 void print_label_goto(label l) {
     ir* cur_ir = new(ir);
-    cur_ir -> func = goto_printer;
+    cur_ir -> funcs = goto_ops;
     cur_ir -> l = l;
     ++l -> cnt;
     add_ir(cur_ir);
@@ -178,7 +175,7 @@ void print_label_goto(label l) {
 
 void print_label(label l) {
     ir* cur_ir = new(ir);
-    cur_ir -> func = label_printer;
+    cur_ir -> funcs = label_ops;
     cur_ir -> l = l;
     add_ir(cur_ir);
 }
@@ -237,31 +234,40 @@ operand set_dummy_operand(operand op) {
     return op;
 }
 
-make_printer(return) {
+make_ir_ops(return);
+make_ir_printer(return) {
     output("RETURN ");
     print_operand(i -> op1);
 }
+make_mips_printer(return) {
+    Assert(0);
+}
 void add_return_ir(operand op) {
     ir* i = new(ir);
-    i -> func = return_printer;
+    i -> funcs = return_ops;
     i -> op1 = op;
     add_ir(i);
 }
 
-make_printer(assign) {
+make_ir_ops(assign);
+make_ir_printer(assign) {
     print_operand(i -> res);
     output(" := ");
     print_operand(i -> op1);
 }
+make_mips_printer(assign) {
+    Assert(0);
+}
 void* add_assign_ir(operand to, operand from) {
     ir* i = new(ir);
-    i -> func = assign_printer;
+    i -> funcs = assign_ops;
     i -> res = to;
     i -> op1 = from;
     return add_ir(i);
 }
 
-make_printer(arith) {
+make_ir_ops(arith);
+make_ir_printer(arith) {
     if(i -> res -> kind != ADDRESS) {
         print_operand(i -> res);
         output(" := ");
@@ -271,7 +277,7 @@ make_printer(arith) {
     } else {
         operand res = i -> res;
         i -> res = new_temp_operand();
-        arith_printer(i);
+        arith_ir_printer(i);
         output("\n");
         print_operand(res);
         output(" := ");
@@ -280,6 +286,10 @@ make_printer(arith) {
         i -> res = res;
     }
 }
+make_mips_printer(arith) {
+    Assert(0);
+}
+
 static inline int opt_arith(operand res, operand op1, int arith_op, operand op2) {
     if(OPTIMIZE(ARITH_CONSTANT)) {
         if(op1 -> kind == CONSTANT && op2 -> kind == CONSTANT) {
@@ -366,7 +376,7 @@ void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
         return;
     }
     ir* i = new(ir);
-    i -> func = arith_printer;
+    i -> funcs = arith_ops;
     i -> val_int = arith_op;
     i -> op1 = op1;
     i -> op2 = op2;
@@ -374,18 +384,23 @@ void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
     add_ir(i);
 }
 
-make_printer(write) {
+make_ir_ops(write);
+make_ir_printer(write) {
     output("WRITE ");
     print_operand(i -> op1);
 }
+make_mips_printer(write) {
+    Assert(0);
+}
 void add_write_ir(operand op) {
     ir* i = new(ir);
-    i -> func = write_printer;
+    i -> funcs = write_ops;
     i -> op1 = op;
     add_ir(i) ;
 }
 
-make_printer(read) {
+make_ir_ops(read);
+make_ir_printer(read) {
     output("READ ");
     if(i->res->kind == ADDRESS) {
         operand tmp = new_temp_operand();
@@ -398,21 +413,25 @@ make_printer(read) {
         print_operand(i -> res);
     }
 }
+make_mips_printer(read) {
+    Assert(0);
+}
 void add_read_ir(operand op) {
     ir* i = new(ir);
-    i -> func = read_printer;
+    i -> funcs = read_ops;
     i -> res = op;
     add_ir(i);
 }
 
-make_printer(fun_call) {
+make_ir_ops(fun_call);
+make_ir_printer(fun_call) {
     if(i -> res -> kind != ADDRESS) {
         print_operand(i -> res);
         output(" := CALL %s", i -> val_str);
     } else {
         operand res = i -> res;
         i -> res = new_temp_operand();
-        fun_call_printer(i);
+        fun_call_ir_printer(i);
         output("\n");
         print_operand(res);
         output(" := ");
@@ -421,33 +440,44 @@ make_printer(fun_call) {
         i -> res = res;
     }
 }
+make_mips_printer(fun_call) {
+    Assert(0);
+}
 void add_fun_call_ir(const char* name, operand op) {
     ir* i = new(ir);
-    i -> func = fun_call_printer;
+    i -> funcs = fun_call_ops;
     i -> val_str = name;
     i -> res = op;
     add_ir(i);
 }
 
-make_printer(fun_dec) {
+make_ir_ops(fun_dec);
+make_ir_printer(fun_dec) {
     output("FUNCTION %s :", i -> val_str);
+}
+make_mips_printer(fun_dec) {
+    Assert(0);
 }
 void add_fun_dec_ir(const char* name) {
     ir* i = new(ir);
-    i -> func = fun_dec_printer;
+    i -> funcs = fun_dec_ops;
     i -> val_str = name;
     add_ir(i);
 }
 
-make_printer(param) {
+make_ir_ops(param);
+make_ir_printer(param) {
     output("PARAM ");
     print_operand(i -> op1);
+}
+make_mips_printer(param) {
+    Assert(0);
 }
 
 static ir params_guard = {
         .prev = &params_guard,
         .next = &params_guard,
-        .func = NULL,
+        .funcs = NULL,
 };
 
 void add_param_ir_flush(const char* name) {
@@ -461,30 +491,42 @@ void add_param_ir_flush(const char* name) {
 
 void add_param_ir_buffered(const char* name) {
     ir* i = new(ir);
-    i -> func = param_printer;
+    i -> funcs = param_ops;
     i -> op1 = new_variable_operand(name);
     add_ir_before(i, &params_guard);
 }
 
-make_printer(label) {
+make_ir_ops(label);
+make_ir_printer(label) {
     output("LABEL l%d :", find(&i -> l) -> no);
 }
-
-make_printer(goto) { //called by if_nz, if_goto
-    output("GOTO l%d", find(&i -> l) -> no);
+make_mips_printer(label) {
+    Assert(0);
 }
 
-make_printer(if_goto) {
+make_ir_ops(goto);
+make_ir_printer(goto) { //called by if_nz, if_goto
+    output("GOTO l%d", find(&i -> l) -> no);
+}
+make_mips_printer(goto) {
+    Assert(0);
+}
+
+make_ir_ops(if_goto);
+make_ir_printer(if_goto) {
     output("IF ");
     print_operand(i -> op1);
     output(" %s ", i -> val_str);
     print_operand(i -> op2);
     output(" ");
-    goto_printer(i);
+    goto_ir_printer(i);
+}
+make_mips_printer(if_goto) {
+    Assert(0);
 }
 void add_if_goto_ir(operand op1, operand op2, const char* cmp, label l) {
     ir* i = new(ir);
-    i -> func = if_goto_printer;
+    i -> funcs = if_goto_ops;
     i -> op1 = op1;
     i -> op2 = op2;
     i -> val_str = cmp;
@@ -496,18 +538,23 @@ void add_if_nz_ir(operand op1, label l) {
     add_if_goto_ir(op1, new_const_operand(0), "!=", l);
 }
 
-make_printer(arg) {
+make_ir_ops(arg);
+make_ir_printer(arg) {
     output("ARG ");
     print_operand(i -> op1);
 }
+make_mips_printer(arg) {
+    Assert(0);
+}
 void add_arg_ir(operand op) {
     ir* i = new(ir);
-    i -> func = arg_printer;
+    i -> funcs = arg_ops;
     i -> op1 = op;
     add_ir(i);
 }
 
-make_printer(dec) {
+make_ir_ops(dec);
+make_ir_printer(dec) {
     output("DEC r_");
     print_operand(i -> op1);
     output(" %d\n",  i -> val_int);
@@ -515,9 +562,12 @@ make_printer(dec) {
     output(" := &r_");
     print_operand(i -> op1);
 }
+make_mips_printer(dec) {
+    Assert(0);
+}
 void add_dec_ir(const char* name ,unsigned size) {
     ir* i = new(ir);
-    i -> func = dec_printer;
+    i -> funcs = dec_ops;
     i -> op1 = new_variable_operand(name);
     i -> val_int = size;
     add_ir(i);
@@ -529,8 +579,8 @@ void add_dec_ir(const char* name ,unsigned size) {
 static int dummy_goto() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur -> func == goto_printer) {
-            if(cur -> next -> func == label_printer) {
+        if(cur -> funcs == goto_ops) {
+            if(cur -> next -> funcs == label_ops) {
                 if(find(&cur -> l) == find(&cur -> next -> l)) {
                     ret = 1;
                     remove_ir(cur);
@@ -545,7 +595,7 @@ static int dummy_goto() {
 static int dummy_label() { //remove labels that will not be jumped to
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur -> func == label_printer) {
+        if(cur -> funcs == label_ops) {
             Assert(cur -> l -> cnt <= 0x3f3f3f3f);
             if(find(&cur -> l)->cnt == 0) {
                 ret = 1;
@@ -568,13 +618,13 @@ __attribute__((unused)) static int chain_assign() {
         if(cur->res &&
            (( cur -> res -> kind == TEMP && !cur->res->multi_use)||
             cur -> res -> kind == CONSTANT)) {
-            if(cur -> next -> func == assign_printer) {
+            if(cur -> next -> funcs == assign_ops) {
                 if(!opcmp(cur -> res, cur -> next -> op1)) {
                     ret = 1;
                     cur -> res = cur -> next -> res;
                     remove_ir(cur -> next);
                 }
-            } else if(cur->func == assign_printer) {
+            } else if(cur->funcs == assign_ops) {
                 int flag = 0;
                 for(int i = 0; i < 2; ++i) {
                     if(!opcmp(cur -> res, cur -> next -> ops[i])) {
@@ -600,8 +650,8 @@ __attribute__((unused)) static int chain_assign() {
 static int chain_goto() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur -> func == label_printer) {
-            if(cur -> next -> func == goto_printer) {
+        if(cur -> funcs == label_ops) {
+            if(cur -> next -> funcs == goto_ops) {
                 ret = 1;
                 merge_label(&cur -> l, &cur -> next -> l);
                 remove_ir(cur);
@@ -623,7 +673,7 @@ static inline int op_include(operand op1, operand op2) {
 }
 
 static inline int check_used(operand op, ir* i) {
-    for(;i->func != fun_dec_printer; i=i->next) {
+    for(;i->funcs != fun_dec_ops; i=i->next) {
         if((op_include(i->op1, op)) ||
            (op_include(i->op2, op)) ||
            (op_include(i->res, op))) {
@@ -636,7 +686,7 @@ static inline int check_used(operand op, ir* i) {
 static int dummy_temp() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur->func != fun_call_printer && cur->res && cur ->res-> kind == TEMP && cur->res->checked == 0) {
+        if(cur->funcs != fun_call_ops && cur->res && cur ->res-> kind == TEMP && cur->res->checked == 0) {
             cur->res->checked = 1;
             if(!check_used(cur->res, cur->next)) {
                 ret = 1;
@@ -650,8 +700,8 @@ static int dummy_temp() {
 static int adj_label() { //remove adjacent label
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur -> func == label_printer) {
-            if(cur -> next -> func == label_printer) {
+        if(cur -> funcs == label_ops) {
+            if(cur -> next -> funcs == label_ops) {
                 ret = 1;
                 merge_label(&cur -> l, &cur -> next -> l);
                 remove_ir(cur);
@@ -666,11 +716,11 @@ static int adj_label() { //remove adjacent label
 static int remove_unreachable() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur -> func == return_printer || cur -> func == goto_printer) {
+        if(cur -> funcs == return_ops || cur -> funcs == goto_ops) {
             for(ir* i = cur -> next; i != &guard; i = i -> next) {
-                if(i -> func == label_printer) {
+                if(i -> funcs == label_ops) {
                     break;
-                } else if(i -> func == fun_dec_printer) {
+                } else if(i -> funcs == fun_dec_ops) {
                     break;
                 } else {
                     ret = 1;
@@ -701,9 +751,9 @@ char* revert_relop(const char* relop) {
 static int redundant_goto() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur->func == if_goto_printer &&
-           cur->next->func == goto_printer &&
-           cur->next->next->func == label_printer) {
+        if(cur->funcs == if_goto_ops &&
+           cur->next->funcs == goto_ops &&
+           cur->next->next->funcs == label_ops) {
             if(find(&cur->l)->no == find(&cur->next->next->l)->no) {
                 ret = 1;
                 --cur->l->cnt;
@@ -718,7 +768,7 @@ static int redundant_goto() {
 }
 static inline ir* find_func(const char* name) {
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur->func == fun_dec_printer) {
+        if(cur->funcs == fun_dec_ops) {
             if(!strcmp(cur->val_str, name)) {
                 return cur;
             }
@@ -786,16 +836,16 @@ static int do_inline(ir* end, const char* fun_name) {
     ir* args = end->prev;
     label func_end = new_label();
     for(ir *callee = find_func(fun_name) -> next;
-        callee->func != fun_dec_printer;
+        callee->funcs != fun_dec_ops;
         callee = callee->next) {
         ir* copyed = new(ir);
-        if(callee->func == param_printer) {
-            while(args->func != arg_printer) {
+        if(callee->funcs == param_ops) {
+            while(args->funcs != arg_ops) {
                 args = args->prev;
             }
             {
                 ir* i = new(ir);
-                i -> func = assign_printer;
+                i -> funcs = assign_ops;
                 i -> res = new_temp_operand();
                 i -> res -> multi_use = 1;
                 i -> op1 = args->op1;
@@ -809,12 +859,12 @@ static int do_inline(ir* end, const char* fun_name) {
         }
         memcpy(copyed, callee, sizeof(*callee));
         add_ir_before(copyed, end);
-        if(callee->func == return_printer) {
-            copyed->func = assign_printer;
+        if(callee->funcs == return_ops) {
+            copyed->funcs = assign_ops;
             copyed->res  = ret_val_res;
             copyed->op1  = inline_op_copy(callee->op1, map);
             ir* cur_ir = new(ir);
-            cur_ir -> func = goto_printer;
+            cur_ir -> funcs = goto_ops;
             cur_ir -> l = func_end;
             ++func_end -> cnt;
             add_ir_before(cur_ir, end);
@@ -842,14 +892,14 @@ static int do_inline(ir* end, const char* fun_name) {
                 }
                 ++(find(&copyed->l)->cnt);
             }
-            if(copyed->func == fun_call_printer) {
+            if(copyed->funcs == fun_call_ops) {
                 copyed->val_int = 1;
             }
         }
     }
     {
         ir* cur_ir = new(ir);
-        cur_ir -> func = label_printer;
+        cur_ir -> funcs = label_ops;
         cur_ir -> l = func_end;
         add_ir_before(cur_ir, end);
     }
@@ -859,10 +909,10 @@ static int do_inline(ir* end, const char* fun_name) {
 static int function_inline() {
     const char* cur_fun_name = NULL;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur->func == fun_dec_printer) {
+        if(cur->funcs == fun_dec_ops) {
             cur_fun_name = cur->val_str;
         } else
-        if(cur->func == fun_call_printer && cur->val_int == 0 &&
+        if(cur->funcs == fun_call_ops && cur->val_int == 0 &&
            strcmp(cur->val_str, "main") && strcmp(cur->val_str, cur_fun_name)) {
             return do_inline(cur, cur->val_str);
         }
@@ -881,7 +931,7 @@ static int replace_op(ir* start, operand from, operand to) {
             ret = 1;
             i->op2 = to;
         }
-        if(!opcmp(i->res, from) || i->func==label_printer || i->func == goto_printer || i->func == return_printer) {
+        if(!opcmp(i->res, from) || i->funcs==label_ops || i->funcs == goto_ops || i->funcs == return_ops) {
             break;
         }
     }
@@ -891,7 +941,7 @@ static int replace_op(ir* start, operand from, operand to) {
 static int const_eliminate() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
-        if(cur->func == assign_printer) {
+        if(cur->funcs == assign_ops) {
             if(cur->op1->kind == CONSTANT && cur->res->kind != ADDRESS) {
                 cur->res->checked = 0;
                 if(cur->res->kind == TEMP && !cur->res->multi_use) {
@@ -900,7 +950,7 @@ static int const_eliminate() {
                 }
                 ret |= replace_op(cur->next, cur->res, cur->op1);
             }
-        } else if(cur->func == arith_printer) {
+        } else if(cur->funcs == arith_ops) {
             if( cur->op1->kind == CONSTANT &&
                 cur->op2->kind == CONSTANT &&
                 cur->res->kind != ADDRESS) {
@@ -965,8 +1015,8 @@ static inline ir* find_assign(operand op, ir* cur) {
 static void check_dummy(operand op, ir* start, ir* cur, ir* end) {
     if(!op)return;
     for(ir *i = cur->next; i != end->next && i != &guard; i = i->next) {
-        if(op_include(i->op1, op) || op_include(i->op2, op) ||
-           (i->res && i->res->kind == ADDRESS && !opcmp(i->res->op, op))) {
+        if (op_include(i->op1, op) || op_include(i->op2, op) ||
+            (i->res && i->res->kind == ADDRESS && !opcmp(i->res->op, op))) {
             return;
         }
     }
@@ -983,8 +1033,8 @@ static void check_dummy(operand op, ir* start, ir* cur, ir* end) {
 
 void dummy_assign(ir* start, ir* end) {
     for(ir *i = start; i != end; i = i->next) {
-        if(i->func == assign_printer ||
-           i->func == arith_printer) {
+        if(i->funcs == assign_ops ||
+            i->funcs == arith_ops) {
             if(i->res->kind==TEMP)
                 check_dummy(i->res, start, i, end);
         }
@@ -1002,4 +1052,25 @@ void tot_optimize() {
                 flag |= optimizers[i].func();
         }
     } while(flag || (OPTIMIZE(2) && function_inline()));
+}
+static inline void predefined() {
+    output(".data\n");
+    output("_prompt: .asciiz \"Enter an integer:\"\n");
+    output("_ret: .asciiz \"\\n\"\n");
+    output(".globl main\n");
+    output(".text\n");
+    output("main:\n");
+    output("  li $v0, 1\n");
+    output("  syscall\n");
+    output("  li $v0, 4\n");
+    output("  la $a0, _ret\n");
+    output("  syscall\n");
+    output("  move $v0, $0\n");
+    output("  jr $ra\n\n");
+}
+
+void print_code() {
+    predefined();
+    for(ir* i = &guard; i != &guard; i = i->next) {
+    }
 }
