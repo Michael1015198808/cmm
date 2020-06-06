@@ -103,45 +103,57 @@ static inline int output(const char* const fmt, ...) {
 }
 #endif
 
-static void print_operand(operand op) {
+#include "printf.h"
+int print_arginfo (const struct printf_info *info, size_t n,
+                      int *argtypes)
+{
+  if (n > 0)
+    argtypes[0] = PA_POINTER;
+  return 1;
+}
+struct printf_info;
+static int print_operand(FILE *stream, const struct printf_info *dummy, const void* const *args) {
+
+    const struct operand_* const op = *(operand*)*args;
+#define cnt_output(...) \
+    do { \
+        cnt += output(__VA_ARGS__); \
+    } while(0)
+    int cnt = 0;
     if(op) {
         switch(op -> kind) {
             case ADDRESS:
-                output("*");
-                print_operand(op -> op);
-                return;
+                cnt_output("*%O", op->op);
+                break;
             case POINTER:
                 Assert(op -> kind == POINTER);
-                output("&");
+                cnt_output("&");
             case VARIABLE:
 #ifndef LOCAL
-                output("v_");
+                cnt_output("v_");
 #endif
-                output("%s", op -> val_str);
+                cnt_output("%s", op -> val_str);
                 break;
             case TEMP:
-                output("t%d", op -> t_no);
+                cnt_output("t%d", op -> t_no);
                 break;
             case CONSTANT:
-                output("#%d", op -> val_int);
+                cnt_output("#%d", op -> val_int);
                 break;
             default:
                 panic();
         }
     } else {
-        output("Unknown");
+        cnt_output("Unknown");
     }
+    return cnt;
 }
 
-void print_ir() {
-    for(ir* i = guard.next; i != &guard; i = i -> next) {
-        //printf("%p\n", i);
-        if(i -> funcs) {
-            i -> funcs -> ir_format(i);
-            output("\n");
-        } else {
-            panic();
-        }
+void register_operand() {
+    static int flag = 0;
+    if(!flag) {
+        flag = 1;
+        register_printf_function('O', print_operand, print_arginfo);
     }
 }
 
@@ -236,11 +248,11 @@ operand set_dummy_operand(operand op) {
 
 make_ir_ops(return);
 make_ir_printer(return) {
-    output("RETURN ");
-    print_operand(i -> op1);
+    output("RETURN %O", i -> op1);
 }
 make_mips_printer(return) {
-    Assert(0);
+    // TODO: move return value to specific register
+    output("jr $ra");
 }
 void add_return_ir(operand op) {
     ir* i = new(ir);
@@ -251,9 +263,7 @@ void add_return_ir(operand op) {
 
 make_ir_ops(assign);
 make_ir_printer(assign) {
-    print_operand(i -> res);
-    output(" := ");
-    print_operand(i -> op1);
+    output("%O := %O", i->res, i->op1);
 }
 make_mips_printer(assign) {
     Assert(0);
@@ -269,19 +279,13 @@ void* add_assign_ir(operand to, operand from) {
 make_ir_ops(arith);
 make_ir_printer(arith) {
     if(i -> res -> kind != ADDRESS) {
-        print_operand(i -> res);
-        output(" := ");
-        print_operand(i -> op1);
-        output(" %c ", i -> val_int);
-        print_operand(i -> op2);
+        output("%O := %O %c %O", i->res, i->op1, i->val_int, i->op2);
     } else {
         operand res = i -> res;
         i -> res = new_temp_operand();
         arith_ir_printer(i);
         output("\n");
-        print_operand(res);
-        output(" := ");
-        print_operand(i -> res);
+        output("%O := %O", res, i->res);
         free(i -> res);
         i -> res = res;
     }
@@ -386,8 +390,7 @@ void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
 
 make_ir_ops(write);
 make_ir_printer(write) {
-    output("WRITE ");
-    print_operand(i -> op1);
+    output("WRITE %O", i->op1);
 }
 make_mips_printer(write) {
     Assert(0);
@@ -404,13 +407,11 @@ make_ir_printer(read) {
     output("READ ");
     if(i->res->kind == ADDRESS) {
         operand tmp = new_temp_operand();
-        print_operand(tmp);
-        output("\n");
-        print_operand(i -> res);
-        output(" := ");
-        print_operand(tmp);
+        output("READ %O\n", tmp);
+        output("%O := %O", i->res, tmp);
+        free(tmp);
     } else {
-        print_operand(i -> res);
+        output("READ %O", i -> res);
     }
 }
 make_mips_printer(read) {
@@ -426,16 +427,13 @@ void add_read_ir(operand op) {
 make_ir_ops(fun_call);
 make_ir_printer(fun_call) {
     if(i -> res -> kind != ADDRESS) {
-        print_operand(i -> res);
-        output(" := CALL %s", i -> val_str);
+        output("%O := CALL %s", i->res, i -> val_str);
     } else {
         operand res = i -> res;
         i -> res = new_temp_operand();
         fun_call_ir_printer(i);
         output("\n");
-        print_operand(res);
-        output(" := ");
-        print_operand(i -> res);
+        output("%O := %O", res, i->res);
         free(i -> res);
         i -> res = res;
     }
@@ -454,9 +452,17 @@ void add_fun_call_ir(const char* name, operand op) {
 make_ir_ops(fun_dec);
 make_ir_printer(fun_dec) {
     output("FUNCTION %s :", i -> val_str);
+    /*
+    new_function();
+    for(ir* ii = i; ii != &guard; ii = ii -> next) {
+        if(ii -> res) {
+            add_variable(ii -> res);
+        }
+    }
+    */
 }
 make_mips_printer(fun_dec) {
-    Assert(0);
+    output("%s:", i -> val_str);
 }
 void add_fun_dec_ir(const char* name) {
     ir* i = new(ir);
@@ -467,8 +473,7 @@ void add_fun_dec_ir(const char* name) {
 
 make_ir_ops(param);
 make_ir_printer(param) {
-    output("PARAM ");
-    print_operand(i -> op1);
+    output("PARAM %O", i->op1);
 }
 make_mips_printer(param) {
     Assert(0);
@@ -514,11 +519,7 @@ make_mips_printer(goto) {
 
 make_ir_ops(if_goto);
 make_ir_printer(if_goto) {
-    output("IF ");
-    print_operand(i -> op1);
-    output(" %s ", i -> val_str);
-    print_operand(i -> op2);
-    output(" ");
+    output("IF %O %s %O ", i->op1, i->val_str, i->op2);
     goto_ir_printer(i);
 }
 make_mips_printer(if_goto) {
@@ -540,8 +541,7 @@ void add_if_nz_ir(operand op1, label l) {
 
 make_ir_ops(arg);
 make_ir_printer(arg) {
-    output("ARG ");
-    print_operand(i -> op1);
+    output("ARG %O", i->op1);
 }
 make_mips_printer(arg) {
     Assert(0);
@@ -555,12 +555,8 @@ void add_arg_ir(operand op) {
 
 make_ir_ops(dec);
 make_ir_printer(dec) {
-    output("DEC r_");
-    print_operand(i -> op1);
-    output(" %d\n",  i -> val_int);
-    print_operand(i -> op1);
-    output(" := &r_");
-    print_operand(i -> op1);
+    output("DEC r_%O %d\n", i->op1, i->val_int);
+    output("%O := &r_%O", i->op1, i->op1);
 }
 make_mips_printer(dec) {
     Assert(0);
@@ -1054,23 +1050,45 @@ void tot_optimize() {
     } while(flag || (OPTIMIZE(2) && function_inline()));
 }
 static inline void predefined() {
-    output(".data\n");
-    output("_prompt: .asciiz \"Enter an integer:\"\n");
-    output("_ret: .asciiz \"\\n\"\n");
-    output(".globl main\n");
-    output(".text\n");
-    output("main:\n");
-    output("  li $v0, 1\n");
-    output("  syscall\n");
-    output("  li $v0, 4\n");
-    output("  la $a0, _ret\n");
-    output("  syscall\n");
-    output("  move $v0, $0\n");
-    output("  jr $ra\n\n");
+    const static char predefined_code[] =
+".data\n"
+"_prompt: .asciiz \"Enter an integer:\"\n"
+"_ret: .asciiz \"\\n\"\n"
+".globl main\n"
+".text\n"
+"read:\n"
+"  li $v0, 4\n"
+"  la $a0, _prompt\n"
+"  syscall\n"
+"  li $v0, 5\n"
+"  syscall\n"
+"  jr $ra\n"
+"\n"
+"write:\n"
+"  li $v0, 1\n"
+"  syscall\n"
+"  li $v0, 4\n"
+"  la $a0, _ret\n"
+"  syscall\n"
+"  move $v0, $0\n"
+"  jr $ra\n"
+;
+    output(predefined_code);
 }
 
-void print_code() {
+void print_ir() {
+    for(ir* i = guard.next; i != &guard; i = i -> next) {
+        Assert(i -> funcs);
+        i->funcs->ir_format(i);
+        output("\n");
+    }
+}
+
+void print_mips() {
     predefined();
-    for(ir* i = &guard; i != &guard; i = i->next) {
+    for(ir* i = guard.next; i != &guard; i = i->next) {
+        Assert(i -> funcs);
+        i->funcs->mips_format(i);
+        output("\n");
     }
 }

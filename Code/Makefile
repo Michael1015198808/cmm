@@ -5,7 +5,7 @@
 CC = gcc
 FLEX = flex
 BISON = bison
-CFLAGS = -std=c99 -g -Wall -Werror -pedantic -Wno-c99-c11-compat -DLOCAL
+CFLAGS = -DLOCAL -std=c99 -g -Wall -Werror -pedantic -Wno-c99-c11-compat -Wno-deprecated-declarations
 
 # 编译目标：src目录下的所有.c文件
 CFILES = $(shell find ./ -name "*.c")
@@ -66,6 +66,6 @@ runall: parser $(TEST_OUT)
 		cat $$case.out; \
 	done;
 run: parser
-	@./parser ../Test/lab4-1.cmm tmp/a.s
-	@spim -file tmp/a.s
+	@./parser ../Test/temp.cmm ../tmp/a.s
+	@spim -file ../tmp/a.s
 	@#./parser ~/compilers-tests/tests/yzy1.cmm ~/repos/irsim/mine.ir

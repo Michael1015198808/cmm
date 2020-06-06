@@ -46,7 +46,7 @@ struct ir_ {
 
 
 void print_ir();
-void print_code();
+void print_mips();
 const ir* last_ir();
 
 label new_label(void);
@@ -104,5 +104,7 @@ void dummy_assign(ir* start, ir* end);
     void name##_mips_printer(ir* i)
 
 make_ir_printer(return);
+
+void register_operand();
 
 #endif //__IR_H__

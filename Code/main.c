@@ -10,6 +10,7 @@ int yydebug = 0;
 void fun_dec_checker();
 void free_tree(node* cur);
 
+
 int main(int argc, const char** argv) {
     void opt_parse(int argc, const char** argv);
     opt_parse(argc, argv);
@@ -24,7 +25,10 @@ int main(int argc, const char** argv) {
             fun_dec_checker();
             if(!error_cnt) {
                 tot_optimize();
+                register_operand();
                 print_ir();
+                //new_scope();
+                //print_mips();
             }
 
             //table_clear();
