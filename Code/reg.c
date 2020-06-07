@@ -18,11 +18,7 @@ static void load(operand op, int reg_idx) {
         output("  li $%d, %d\n", reg_idx, op->val_int);
     } else {
         if(op->kind == ADDRESS) {
-            op = op->op;
-            const char *str = op_to_str(op);
-            unsigned offset = table_lookup(str)->offset;
-            free((void *)str);
-            output("  addi $%d, $sp, %d\n", reg_idx, offset);
+            output("  lw $%d, 0($%d)\n", reg_idx, reg(op->op));
         } else {
             const char *str = op_to_str(op);
             Type t = table_lookup(str);
@@ -33,18 +29,29 @@ static void load(operand op, int reg_idx) {
                 output("  addi $%d, $sp, %d\n", reg_idx, t->offset);
             }
         }
-        reg_info[reg_idx] = op;
     }
 }
 
 static void spill(int reg_idx) {
-    if (reg_info[reg_idx] && reg_info[reg_idx]->kind != CONSTANT) {
-        const char *str = op_to_str(reg_info[reg_idx]);
-        unsigned offset = table_lookup(str)->offset;
-        free((void *)str);
-        output("  sw $%d, %d($sp)\n", reg_idx, offset);
+    operand op = reg_info[reg_idx];
+    if (op && op->kind != CONSTANT) {
+        if(op->kind == ADDRESS) {
+            int r1 = reg(op->op);
+            output("  sw $%d, 0($%d)\n", reg_idx, r1);
+        } else {
+            const char *str = op_to_str(reg_info[reg_idx]);
+            Type t = table_lookup(str);
+            free((void *)str);
+            if (t->kind == OFFSET_BASIC)
+                output("  sw $%d, %d($sp)\n", reg_idx, t->offset);
+        }
     }
     reg_info[reg_idx] = NULL;
+}
+void spill_all() {
+    for(int i = 2; i < MAX_AVAIL; ++i) {
+        spill(i);
+    }
 }
 
 int find_op(operand op) {
@@ -57,22 +64,16 @@ int find_op(operand op) {
 }
 
 void reg_free(int reg_idx) {
-    is_using[reg_idx] = 0;
     spill(reg_idx);
+    is_using[reg_idx] = 0;
+    reg_info[reg_idx] = NULL;
 }
+
 void op_free(operand op) {
-    if(op->kind == ADDRESS) op = op -> op;
     reg_free(find_op(op));
 }
 
-int ensure(operand op) {
-    if(op->kind == CONSTANT) return 0;
-    return reg(op);
-}
-
-static int reg_real(operand op_raw, int load_flag) {
-    operand op = op_raw;
-    if(op && op->kind == ADDRESS) op = op -> op;
+static int reg_real(operand op, int load_flag) {
     int idx = find_op(op);
     if(idx) {
         is_using[idx] = 1;
@@ -81,7 +82,7 @@ static int reg_real(operand op_raw, int load_flag) {
     for(int i = 2; i < MAX_AVAIL; ++i) {
         if(!is_using[i]) {
             if(load_flag) {
-                load(op_raw, i);
+                load(op, i);
             }
             reg_info[i] = op;
             is_using[i] = 1;
@@ -91,19 +92,19 @@ static int reg_real(operand op_raw, int load_flag) {
     Assert(0);
     return 0;
 }
+
+//return the register contains the op
 int reg(operand op) {
     return reg_real(op, 1);
 }
+//return a register unused
 int tmp_reg() {
     return reg_real(NULL, 0);
 }
+//mark a register with op
 int reg_noload(operand op) {
     Assert(op->kind != CONSTANT);
     return reg_real(op, 0);
-}
-
-void reg_init() {
-    is_using[0] = is_using[1] = is_using[26] = is_using[27] = 1;
 }
 
 void reg_use(int reg_idx) {

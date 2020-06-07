@@ -2,6 +2,7 @@
 #include "syscall.h"
 #include "common.h"
 #include "offset.h"
+#include "table.h"
 #include "ir.h"
 #include "reg.h"
 void* memcpy(void*, const void*, size_t);
@@ -291,13 +292,13 @@ make_ir_printer(return) {
     output("RETURN %O", i -> op1);
 }
 make_mips_printer(return) {
-    ensure(i->op1);
     if(i->op1->kind == CONSTANT) {
         output("  li $v0, %d\n", i->op1->val_int);
     } else {
-        output("  move $v0, %R\n", i->op1);
+        int r1 = reg(i->op1);
+        output("  move $v0, $%d\n", r1);
+        reg_free(r1);
     }
-    op_free(i->op1);
     output("  jr $ra\n");
 }
 void add_return_ir(operand op) {
@@ -312,32 +313,11 @@ make_ir_printer(assign) {
     output("%O := %O", i->res, i->op1);
 }
 make_mips_printer(assign) {
-    if(i->res->kind == ADDRESS) {
-        if(i->op1->kind == ADDRESS) {
-            reg(i->op1);
-            reg_noload(i->res);
-            int tmp = tmp_reg();
-            output("  lw $%d, %R\n", tmp, i->op1);
-            output("  sw $%d, %R\n", tmp, i->res);
-            reg_free(tmp);
-        } else {
-            reg(i->op1);
-            reg(i->res);
-            output("  sw %R, %R\n", i->op1, i->res);
-        }
-    } else {
-        if(i->op1->kind == ADDRESS) {
-            reg(i->op1);
-            reg_noload(i->res);
-            output("  lw %R, %R\n", i->res, i->op1);
-        } else {
-            ensure(i->op1);
-            reg_noload(i->res);
-            output("  %s %R, %R\n", i->op1->kind == CONSTANT ? "li" : "move", i->res, i->op1);
-        }
-    }
-    op_free(i->op1);
-    op_free(i->res);
+    int r1 = reg(i->op1);
+    int rr = reg_noload(i->res);
+    output("  move $%d, $%d\n", rr, r1);
+    reg_free(r1);
+    reg_free(rr);
 }
 void* add_assign_ir(operand to, operand from) {
     ir* i = new(ir);
@@ -381,11 +361,11 @@ make_mips_printer(arith) {
     }
     int r1 = reg(i->op1);
     int r2 = reg(i->op2);
-    reg_noload(i->res);
-    output("  %s %R, $%d, $%d\n", op, i->res, r1, r2);
-    op_free(i->op1);
-    op_free(i->op2);
-    op_free(i->res);
+    int rr = reg_noload(i->res);
+    output("  %s $%d, $%d, $%d\n", op, rr, r1, r2);
+    reg_free(r1);
+    reg_free(r2);
+    reg_free(rr);
 }
 
 static inline int opt_arith(operand res, operand op1, int arith_op, operand op2) {
@@ -487,22 +467,17 @@ make_ir_printer(write) {
     output("WRITE %O", i->op1);
 }
 make_mips_printer(write) {
+    reg_use(4);
     static const char* const str = 
 SYSCALL(sys_print_int)
 "  la $a0, _ret\n"
 SYSCALL(sys_print_string)
 "  move $v0, $0\n";
-    if(i->op1->kind == ADDRESS) {
-        reg(i->op1->op);
-        output("  lw $a0, 0(%R)\n", i->op1->op);
-        op_free(i->op1->op);
-        output(str);
-    } else {
-        ensure(i->op1);
-        output("  %s $a0, %R\n", i->op1->kind == CONSTANT ? "li" : "move", i->op1);
-        op_free(i->op1);
-        output(str);
-    }
+    int r1 = reg(i->op1);
+    output("  move $a0, $%d\n", r1);
+    reg_free(r1);
+    reg_free(4);
+    output(str);
 }
 void add_write_ir(operand op) {
     ir* i = new(ir);
@@ -528,15 +503,9 @@ make_mips_printer(read) {
 SYSCALL(sys_print_string)
 SYSCALL(sys_read_int);
     output(str);
-    if(i->res->kind == ADDRESS) {
-        reg_noload(i->res->op);
-        output("  sw $v0, 0(%R)\n", i->res->op);
-        op_free(i->res->op);
-    } else {
-        reg_noload(i->res);
-        output("  move %R, $v0\n", i->res);
-        op_free(i->res);
-    }
+    reg_noload(i->res);
+    output("  move %R, $v0\n", i->res);
+    op_free(i->res);
 }
 void add_read_ir(operand op) {
     ir* i = new(ir);
@@ -559,15 +528,29 @@ make_ir_printer(fun_call) {
         i -> res = res;
     }
 }
+static int fun_arg_cnt(Type t) {
+    int ret = 0;
+    Assert(t->kind == FUNCTION);
+    for(FieldList f = t->structure->next; f; f = f->next) {
+        ++ret;
+    }
+    return ret;
+}
+int args_cnt = 1;
 make_mips_printer(fun_call) {
+    args_cnt -= fun_arg_cnt(table_lookup(i->val_str));
+    const int ret_addr_off = get_offset() - 4;
+    const int frame_size = -get_offset() + 4 * args_cnt;
+    const int rr = reg_noload(i->res);
     output(
-"  addi $sp, $sp, -10\n"
-"  sw $ra, 0($sp)\n"
+"  sw $ra, %d($sp)\n"
+"  addi $sp, $sp, -%d\n"
 "  jal %s\n"
-"  lw $ra, 0($sp)\n"
 "  move $%d, $v0\n"
-"  addi $sp, $sp, 10\n",
-    i->val_str, reg(i->res));
+"  addi $sp, $sp, %d\n"
+"  lw $ra, %d($sp)\n",
+    ret_addr_off, frame_size, i->val_str, rr, frame_size, ret_addr_off);
+    reg_free(rr);
 }
 void add_fun_call_ir(const char* name, operand op) {
     ir* i = new(ir);
@@ -580,7 +563,7 @@ void add_fun_call_ir(const char* name, operand op) {
 make_ir_ops(dec);
 make_ir_printer(dec) {
     output("DEC r_%O %d\n", i->op1, i->val_int);
-    output("#%O := &r_%O", i->op1, i->op1);
+    output("%O := &r_%O", i->op1, i->op1);
 }
 make_mips_printer(dec) {
 }
@@ -592,6 +575,13 @@ void add_dec_ir(const char* name ,unsigned size) {
     add_ir(i);
 }
 
+make_ir_ops(param);
+make_ir_printer(param) {
+    output("PARAM %O", i->res);
+}
+make_mips_printer(param) {
+}
+
 make_ir_ops(fun_dec);
 make_ir_printer(fun_dec) {
     output("FUNCTION %s :", i -> val_str);
@@ -599,14 +589,20 @@ make_ir_printer(fun_dec) {
 make_mips_printer(fun_dec) {
     output("%s:\n", i -> val_str);
     new_function();
-    for(ir* ins = i->next; ins->funcs != fun_dec_ops; ins = ins -> next) {
+    ir* ins = i->next;
+    while(ins->funcs == param_ops) {
+        ins = ins->next;
+    }
+    for(ir* tmp = ins->prev; tmp->funcs != fun_dec_ops; tmp = tmp->prev) {
+        add_int_variable(tmp->res);
+    }
+    for(; ins->funcs != fun_dec_ops; ins = ins -> next) {
         if(ins -> funcs == dec_ops) {
-            add_variable(ins -> op1, ins->val_int);
+            add_comp_variable(ins -> op1, ins->val_int);
         } else if(ins->res && ins->res->kind != ADDRESS) {
             add_int_variable(ins -> res);
         }
     }
-    output("  addi $sp, $sp, -%d\n", get_offset());
 }
 void add_fun_dec_ir(const char* name) {
     ir* i = new(ir);
@@ -615,12 +611,6 @@ void add_fun_dec_ir(const char* name) {
     add_ir(i);
 }
 
-make_ir_ops(param);
-make_ir_printer(param) {
-    output("PARAM %O", i->res);
-}
-make_mips_printer(param) {
-}
 
 static ir params_guard = {
         .prev = &params_guard,
@@ -681,12 +671,12 @@ const char* relop_to_str(const char* const str) {
     }
 }
 make_mips_printer(if_goto) {
-    reg(i->op1);
-    reg(i->op2);
+    int r1 = reg(i->op1);
+    int r2 = reg(i->op2);
     const char* const relop = relop_to_str(i->val_str);
-    output("b%s %R, %R, l%d\n", relop, i->op1, i->op2, find(&i->l) -> no);
-    op_free(i->op1);
-    op_free(i->op2);
+    output("  b%s $%d, $%d, l%d\n", relop, r1, r2, find(&i->l) -> no);
+    reg_free(r1);
+    reg_free(r2);
 }
 void add_if_goto_ir(operand op1, operand op2, const char* cmp, label l) {
     ir* i = new(ir);
@@ -707,9 +697,9 @@ make_ir_printer(arg) {
     output("ARG %O", i->op1);
 }
 make_mips_printer(arg) {
-    reg(i->op1);
-    output("  sw %R 0($fp)\n", i->op1);
-    op_free(i->op1);
+    int r1 = reg(i->op1);
+    output("  sw $%d %d($sp)\n", r1, get_offset() - (++args_cnt) * 4);
+    reg_free(r1);
 }
 void add_arg_ir(operand op) {
     ir* i = new(ir);

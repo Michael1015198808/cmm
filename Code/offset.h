@@ -3,7 +3,7 @@
 
 void new_function();
 void add_int_variable(operand);
-void add_variable(operand, unsigned size);
+void add_comp_variable(operand, unsigned size);
 int get_offset();
 
 #endif

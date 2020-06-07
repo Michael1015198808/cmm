@@ -7,7 +7,6 @@ void op_free(operand);
 int reg_noload(operand op);
 int reg(operand op);
 int ensure(operand op);
-void reg_init();
 void reg_use(int reg_idx);
 int find_op(operand op);
 void reg_free(int reg_idx);

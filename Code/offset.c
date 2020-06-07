@@ -2,27 +2,34 @@
 #include <stdlib.h>
 #include "table.h"
 #include "type.h"
-#define CONTEXT_INFO 4
+#define CONTEXT_INFO 0
+#define INT_SIZE 4
 static int offset = CONTEXT_INFO;
 
-void add_variable(operand op, unsigned size) {
+int output(const char* const fmt, ...);
+static void add_variable_real(operand op, int is_basic, unsigned size) {
     Type t = new(struct Type_);
     const char* const s = op_to_str(op);
     if (table_lookup(s)) {
         free((void*)s); // already exists, free the memory
     } else {
-        if(size == 4) {
+        if(is_basic) {
             t->kind = OFFSET_BASIC;
         } else {
             t->kind = OFFSET_COMP;
         }
-        t->offset = (offset += size);
+        //output("#%s from %d to ", s, offset);
+        t->offset = (offset -= size);
+        //output("%d\n", offset);
         table_insert(s, t);
     }
 }
 
+void add_comp_variable(operand op, unsigned size) {
+    add_variable_real(op, 0, size);
+}
 void add_int_variable(operand op) {
-    add_variable(op, 4);
+    add_variable_real(op, 1, INT_SIZE);
 }
 
 void new_function() {
