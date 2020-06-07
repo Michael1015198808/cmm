@@ -2,7 +2,8 @@
 #define __OFFSET_H__
 
 void new_function();
-void add_int_variable(const char* s);
-void add_variable(const char* s, unsigned size);
+void add_int_variable(operand);
+void add_variable(operand, unsigned size);
+int get_offset();
 
 #endif

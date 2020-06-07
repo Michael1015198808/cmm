@@ -9,6 +9,9 @@
 
 #define YYSTYPE node*
 
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+
 #define err(...) fprintf(stderr, __VA_ARGS__)
 
 #define new(type) (type*)memset(malloc(sizeof(type)), 0, sizeof(type))

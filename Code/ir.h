@@ -16,9 +16,12 @@ struct operand_ {
     enum {VARIABLE, CONSTANT, ADDRESS, POINTER, TEMP, DUMMY} kind;
 };
 
+const char* op_to_str(operand);
+
 typedef struct ir_ ir;
 typedef void(*printer)(ir*);
 
+int opcmp(operand op1, operand op2);
 
 typedef struct label_* label;
 struct label_ {
@@ -105,6 +108,6 @@ void dummy_assign(ir* start, ir* end);
 
 make_ir_printer(return);
 
-void register_operand();
+void register_printf_operand();
 
 #endif //__IR_H__

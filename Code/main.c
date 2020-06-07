@@ -25,10 +25,10 @@ int main(int argc, const char** argv) {
             fun_dec_checker();
             if(!error_cnt) {
                 tot_optimize();
-                register_operand();
-                print_ir();
-                //new_scope();
-                //print_mips();
+                register_printf_operand();
+                //print_ir();
+                new_scope();
+                print_mips();
             }
 
             //table_clear();
