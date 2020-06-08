@@ -545,7 +545,7 @@ make_mips_printer(fun_call) {
     output(
 "  sw $ra, %d($sp)\n"
 "  addi $sp, $sp, -%d\n"
-"  jal %s\n"
+"  jal f_%s\n"
 "  move $%d, $v0\n"
 "  addi $sp, $sp, %d\n"
 "  lw $ra, %d($sp)\n",
@@ -587,10 +587,10 @@ make_ir_printer(fun_dec) {
     output("FUNCTION %s :", i -> val_str);
 }
 make_mips_printer(fun_dec) {
-    output("%s:\n", i -> val_str);
+    output("f_%s:\n", i -> val_str);
     new_function();
     ir* ins = i->next;
-    //Assert(args_cnt == 1);
+    Assert(args_cnt == 1);
     args_cnt = 1;//add for security
     while(ins->funcs == param_ops) {
         ins = ins->next;
@@ -1217,6 +1217,8 @@ SYSCALL(sys_print_string)
 "  move $v0, $0\n"
 "  jr $ra\n"
 "\n"
+"main:\n"
+"  jr f_main\n"
 ;
     output(predefined_code);
 }

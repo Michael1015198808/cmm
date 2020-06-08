@@ -66,6 +66,7 @@ int find_op(operand op) {
 }
 
 void reg_free(int reg_idx) {
+
     spill(reg_idx);
     is_using[reg_idx] = 0;
     reg_info[reg_idx] = NULL;
