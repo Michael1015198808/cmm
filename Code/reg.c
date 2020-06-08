@@ -33,13 +33,24 @@ static void load(operand op, int reg_idx) {
     }
 }
 
+int find_op(operand op) {
+    for(int i = 2; i < MAX_AVAIL; ++i) {
+        if(!opcmp(op, reg_info[i])) {
+            return i;
+        }
+    }
+    return 0;
+}
+
 static void spill(int reg_idx) {
     operand op = reg_info[reg_idx];
     if (op && op->kind != CONSTANT) {
         if(op->kind == ADDRESS) {
+            int flag = find_op(op->op);
             int r1 = reg(op->op);
             output("  sw $%d, 0($%d)\n", reg_idx, r1);
-            reg_free(r1);
+            if(!flag)
+                reg_free(r1);
         } else {
             const char *str = op_to_str(reg_info[reg_idx]);
             Type t = table_lookup(str);
@@ -54,15 +65,6 @@ void spill_all() {
     for(int i = 2; i < MAX_AVAIL; ++i) {
         spill(i);
     }
-}
-
-int find_op(operand op) {
-    for(int i = 2; i < MAX_AVAIL; ++i) {
-        if(!opcmp(op, reg_info[i])) {
-            return i;
-        }
-    }
-    return 0;
 }
 
 void reg_free(int reg_idx) {

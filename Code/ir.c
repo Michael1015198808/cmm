@@ -7,7 +7,11 @@
 #include "reg.h"
 void* memcpy(void*, const void*, size_t);
 
-int reg(operand);
+#define ir_output(fmt, ...) \
+    output("#" fmt, ##__VA_ARGS__)
+
+#define mips_output(fmt, ...) \
+    output("  " fmt, ## __VA_ARGS__)
 
 static ir guard = {
         .prev = &guard,
@@ -15,7 +19,21 @@ static ir guard = {
         .funcs = NULL,
 };
 
-static ir_ops *if_goto_ops, *goto_ops, *label_ops;
+static inline void list_check(ir* i) {
+    Assert(i == i->prev->next);
+    Assert(i == i->next->prev);
+}
+static inline void add_ir_before(ir* i, ir* list_guard) {
+    list_check(list_guard);
+    i->prev = list_guard -> prev;
+    i->next = list_guard;
+    i->prev->next = i->next->prev = i;
+}
+
+static void* add_ir(ir* i) {
+    add_ir_before(i, &guard);
+    return i;
+}
 
 extern FILE* const out_file;
 int opcmp(operand op1, operand op2) {
@@ -24,7 +42,6 @@ int opcmp(operand op1, operand op2) {
             switch(op1->kind) {
                 case CONSTANT:
                     return op1->val_int!=op2->val_int;
-                case POINTER:
                 case VARIABLE:
                     return strcmp(op1->val_str, op2->val_str);
                 case TEMP:
@@ -55,36 +72,13 @@ static inline label find(label* lp) {
 const ir* last_ir() {
     return guard.prev;
 }
-static inline void list_check(ir* i) {
-    Assert(i == i->prev->next);
-    Assert(i == i->next->prev);
-}
 static inline void whole_check() {
     for(ir* i = guard.next; i != &guard; i = i->next) {
         list_check(i);
     }
 }
 
-void remove_ir(ir* i) {
-    Assert(i != &guard);
-    list_check(i);
-    i -> prev -> next = i -> next;
-    i -> next -> prev = i -> prev;
-    if(i -> funcs == goto_ops || i -> funcs == if_goto_ops) {
-        --(find(&i -> l) -> cnt);
-    }
-}
 
-static inline void add_ir_before(ir* i, ir* list_guard) {
-    list_check(list_guard);
-    i->prev = list_guard -> prev;
-    i->next = list_guard;
-    i->prev->next = i->next->prev = i;
-}
-static void* add_ir(ir* i) {
-    add_ir_before(i, &guard);
-    return i;
-}
 #ifdef LOCAL
 int output(const char* const fmt, ...) {
     va_list va;
@@ -130,9 +124,6 @@ static int print_operand(FILE *stream, const struct printf_info *dummy, const vo
             case ADDRESS:
                 cnt_output("*%O", op->op);
                 break;
-            case POINTER:
-                Assert(op -> kind == POINTER);
-                cnt_output("&");
             case VARIABLE:
 #ifndef LOCAL
                 cnt_output("v_");
@@ -144,33 +135,6 @@ static int print_operand(FILE *stream, const struct printf_info *dummy, const vo
                 break;
             case CONSTANT:
                 cnt_output("#%d", op -> val_int);
-                break;
-            default:
-                panic();
-        }
-    } else {
-        cnt_output("Unknown");
-    }
-    return cnt;
-}
-static int print_reg(FILE *stream, const struct printf_info *dummy, const void* const *args) {
-    const operand op = *(operand*)*args;
-    int cnt = 0;
-    if(op) {
-        switch(op -> kind) {
-            case ADDRESS:
-                cnt_output("0(%R)", op->op);
-                break;
-            case POINTER:
-                Assert(0);
-            case CONSTANT:
-                if (find_op(op) == 0) {
-                    cnt_output("%d", op->val_int);
-                    break;
-                }
-            case VARIABLE:
-            case TEMP:
-                cnt_output("$%d", reg(op));
                 break;
             default:
                 panic();
@@ -194,7 +158,6 @@ void register_printf_operand() {
     if(!flag) {
         flag = 1;
         Assert(register_printf_function('O', print_operand, print_arginfo) == 0);
-        Assert(register_printf_function('R', print_reg,     print_arginfo) == 0);
     }
 }
 
@@ -216,21 +179,6 @@ static inline void merge_label(label* lp1, label* lp2) {
         l2 -> cnt += l1 -> cnt;
         l1 -> cnt = 0;
     }
-}
-
-void print_label_goto(label l) {
-    ir* cur_ir = new(ir);
-    cur_ir -> funcs = goto_ops;
-    cur_ir -> l = l;
-    ++l -> cnt;
-    add_ir(cur_ir);
-}
-
-void print_label(label l) {
-    ir* cur_ir = new(ir);
-    cur_ir -> funcs = label_ops;
-    cur_ir -> l = l;
-    add_ir(cur_ir);
 }
 
 operand new_temp_operand() {
@@ -287,20 +235,20 @@ operand set_dummy_operand(operand op) {
     return op;
 }
 
-make_ir_ops(return);
 make_ir_printer(return) {
-    output("RETURN %O", i -> op1);
+    ir_output("RETURN %O", i -> op1);
 }
 make_mips_printer(return) {
     if(i->op1->kind == CONSTANT) {
-        output("  li $v0, %d\n", i->op1->val_int);
+        mips_output("li $v0, %d\n", i->op1->val_int);
     } else {
         int r1 = reg(i->op1);
-        output("  move $v0, $%d\n", r1);
+        mips_output("move $v0, $%d\n", r1);
         reg_free(r1);
     }
     output("  jr $ra\n");
 }
+make_ir_ops(return);
 void add_return_ir(operand op) {
     ir* i = new(ir);
     i -> funcs = return_ops;
@@ -308,17 +256,17 @@ void add_return_ir(operand op) {
     add_ir(i);
 }
 
-make_ir_ops(assign);
 make_ir_printer(assign) {
-    output("%O := %O", i->res, i->op1);
+    ir_output("%O := %O", i->res, i->op1);
 }
 make_mips_printer(assign) {
     int r1 = reg(i->op1);
     int rr = reg_noload(i->res);
-    output("  move $%d, $%d\n", rr, r1);
+    mips_output("move $%d, $%d\n", rr, r1);
     reg_free(r1);
     reg_free(rr);
 }
+make_ir_ops(assign);
 void* add_assign_ir(operand to, operand from) {
     ir* i = new(ir);
     i -> funcs = assign_ops;
@@ -327,16 +275,15 @@ void* add_assign_ir(operand to, operand from) {
     return add_ir(i);
 }
 
-make_ir_ops(arith);
 make_ir_printer(arith) {
     if(i -> res -> kind != ADDRESS) {
-        output("%O := %O %c %O", i->res, i->op1, i->val_int, i->op2);
+        ir_output("%O := %O %c %O", i->res, i->op1, i->val_int, i->op2);
     } else {
         operand res = i -> res;
         i -> res = new_temp_operand();
         arith_ir_printer(i);
         output("\n");
-        output("%O := %O", res, i->res);
+        ir_output("%O := %O", res, i->res);
         free(i -> res);
         i -> res = res;
     }
@@ -362,11 +309,12 @@ make_mips_printer(arith) {
     int r1 = reg(i->op1);
     int r2 = reg(i->op2);
     int rr = reg_noload(i->res);
-    output("  %s $%d, $%d, $%d\n", op, rr, r1, r2);
+    mips_output("%s $%d, $%d, $%d\n", op, rr, r1, r2);
     reg_free(r1);
     reg_free(r2);
     reg_free(rr);
 }
+make_ir_ops(arith);
 
 static inline int opt_arith(operand res, operand op1, int arith_op, operand op2) {
     if(OPTIMIZE(ARITH_CONSTANT)) {
@@ -462,9 +410,8 @@ void add_arith_ir(operand res, operand op1, int arith_op, operand op2) {
     add_ir(i);
 }
 
-make_ir_ops(write);
 make_ir_printer(write) {
-    output("WRITE %O", i->op1);
+    ir_output("WRITE %O", i->op1);
 }
 make_mips_printer(write) {
     reg_use(4);
@@ -473,12 +420,14 @@ SYSCALL(sys_print_int)
 "  la $a0, _ret\n"
 SYSCALL(sys_print_string)
 "  move $v0, $0\n";
+
     int r1 = reg(i->op1);
-    output("  move $a0, $%d\n", r1);
+    mips_output("move $a0, $%d\n", r1);
     reg_free(r1);
     reg_free(4);
     output(str);
 }
+make_ir_ops(write);
 void add_write_ir(operand op) {
     ir* i = new(ir);
     i -> funcs = write_ops;
@@ -486,15 +435,14 @@ void add_write_ir(operand op) {
     add_ir(i) ;
 }
 
-make_ir_ops(read);
 make_ir_printer(read) {
     if(i->res->kind == ADDRESS) {
         operand tmp = new_temp_operand();
-        output("READ %O\n", tmp);
-        output("%O := %O", i->res, tmp);
+        ir_output("READ %O\n", tmp);
+        ir_output("%O := %O", i->res, tmp);
         free(tmp);
     } else {
-        output("READ %O", i -> res);
+        ir_output("READ %O", i -> res);
     }
 }
 make_mips_printer(read) {
@@ -503,10 +451,11 @@ make_mips_printer(read) {
 SYSCALL(sys_print_string)
 SYSCALL(sys_read_int);
     output(str);
-    reg_noload(i->res);
-    output("  move %R, $v0\n", i->res);
-    op_free(i->res);
+    int rr = reg_noload(i->res);
+    mips_output("move $%d, $v0\n", rr);
+    reg_free(rr);
 }
+make_ir_ops(read);
 void add_read_ir(operand op) {
     ir* i = new(ir);
     i -> funcs = read_ops;
@@ -514,16 +463,15 @@ void add_read_ir(operand op) {
     add_ir(i);
 }
 
-make_ir_ops(fun_call);
 make_ir_printer(fun_call) {
     if(i -> res -> kind != ADDRESS) {
-        output("%O := CALL %s", i->res, i -> val_str);
+        ir_output("%O := CALL %s", i->res, i -> val_str);
     } else {
         operand res = i -> res;
         i -> res = new_temp_operand();
         fun_call_ir_printer(i);
         output("\n");
-        output("%O := %O", res, i->res);
+        ir_output("%O := %O", res, i->res);
         free(i -> res);
         i -> res = res;
     }
@@ -552,6 +500,7 @@ make_mips_printer(fun_call) {
     ret_addr_off, frame_size, i->val_str, rr, frame_size, ret_addr_off);
     reg_free(rr);
 }
+make_ir_ops(fun_call);
 void add_fun_call_ir(const char* name, operand op) {
     ir* i = new(ir);
     i -> funcs = fun_call_ops;
@@ -560,13 +509,12 @@ void add_fun_call_ir(const char* name, operand op) {
     add_ir(i);
 }
 
-make_ir_ops(dec);
 make_ir_printer(dec) {
-    output("DEC r_%O %d\n", i->op1, i->val_int);
-    output("%O := &r_%O", i->op1, i->op1);
+    ir_output("DEC r_%O %d\n", i->op1, i->val_int);
+    ir_output("%O := &r_%O", i->op1, i->op1);
 }
-make_mips_printer(dec) {
-}
+make_mips_printer(dec) {}
+make_ir_ops(dec);
 void add_dec_ir(const char* name ,unsigned size) {
     ir* i = new(ir);
     i -> funcs = dec_ops;
@@ -575,28 +523,25 @@ void add_dec_ir(const char* name ,unsigned size) {
     add_ir(i);
 }
 
-make_ir_ops(param);
 make_ir_printer(param) {
-    output("PARAM %O", i->res);
+    ir_output("PARAM %O", i->res);
 }
-make_mips_printer(param) {
-}
+make_mips_printer(param) {}
+make_ir_ops(param);
 
-make_ir_ops(fun_dec);
 make_ir_printer(fun_dec) {
-    output("FUNCTION %s :", i -> val_str);
+    ir_output("FUNCTION %s :", i -> val_str);
 }
+static ir_ops* fun_dec_ops;
 make_mips_printer(fun_dec) {
     output("f_%s:\n", i -> val_str);
     new_function();
     ir* ins = i->next;
+
     Assert(args_cnt == 1);
     args_cnt = 1;//add for security
-    while(ins->funcs == param_ops) {
-        ins = ins->next;
-    }
-    for(ir* tmp = ins->prev; tmp->funcs != fun_dec_ops; tmp = tmp->prev) {
-        add_int_variable(tmp->res);
+    for(FieldList f = table_lookup(i->val_str)->structure->next; f; f = f->next) {
+        add_int_variable(new_variable_operand(f->name));
     }
     for(; ins->funcs != fun_dec_ops; ins = ins -> next) {
         if(ins -> funcs == dec_ops) {
@@ -606,6 +551,7 @@ make_mips_printer(fun_dec) {
         }
     }
 }
+make_ir_ops(fun_dec);
 void add_fun_dec_ir(const char* name) {
     ir* i = new(ir);
     i -> funcs = fun_dec_ops;
@@ -636,25 +582,24 @@ void add_param_ir_buffered(const char* name) {
     add_ir_before(i, &params_guard);
 }
 
-make_ir_ops(label);
 make_ir_printer(label) {
-    output("LABEL l%d :", find(&i -> l) -> no);
+    ir_output("LABEL l%d :", find(&i -> l) -> no);
 }
 make_mips_printer(label) {
     output("l%d:\n", find(&i -> l) -> no);
 }
+make_ir_ops(label);
 
-make_ir_ops(goto);
 make_ir_printer(goto) { //called by if_nz, if_goto
-    output("GOTO l%d", find(&i -> l) -> no);
+    ir_output("GOTO l%d", find(&i -> l) -> no);
 }
 make_mips_printer(goto) {
-    output("j l%d\n", find(&i -> l) -> no);
+    mips_output("j l%d\n", find(&i -> l) -> no);
 }
+make_ir_ops(goto);
 
-make_ir_ops(if_goto);
 make_ir_printer(if_goto) {
-    output("IF %O %s %O ", i->op1, i->val_str, i->op2);
+    ir_output("IF %O %s %O ", i->op1, i->val_str, i->op2);
     goto_ir_printer(i);
 }
 const char* relop_to_str(const char* const str) {
@@ -676,10 +621,11 @@ make_mips_printer(if_goto) {
     int r1 = reg(i->op1);
     int r2 = reg(i->op2);
     const char* const relop = relop_to_str(i->val_str);
-    output("  b%s $%d, $%d, l%d\n", relop, r1, r2, find(&i->l) -> no);
+    mips_output("b%s $%d, $%d, l%d\n", relop, r1, r2, find(&i->l) -> no);
     reg_free(r1);
     reg_free(r2);
 }
+make_ir_ops(if_goto);
 void add_if_goto_ir(operand op1, operand op2, const char* cmp, label l) {
     ir* i = new(ir);
     i -> funcs = if_goto_ops;
@@ -694,15 +640,15 @@ void add_if_nz_ir(operand op1, label l) {
     add_if_goto_ir(op1, new_const_operand(0), "!=", l);
 }
 
-make_ir_ops(arg);
 make_ir_printer(arg) {
-    output("ARG %O", i->op1);
+    ir_output("ARG %O", i->op1);
 }
 make_mips_printer(arg) {
     int r1 = reg(i->op1);
-    output("  sw $%d %d($sp)\n", r1, get_offset() - (++args_cnt) * 4);
+    mips_output("sw $%d %d($sp)\n", r1, get_offset() - (++args_cnt) * 4);
     reg_free(r1);
 }
+make_ir_ops(arg);
 void add_arg_ir(operand op) {
     ir* i = new(ir);
     i -> funcs = arg_ops;
@@ -1120,29 +1066,13 @@ static int adj_arith() {
     return ret;
 }
 
-static int template() {
+__attribute__((unused)) static int template() {
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
     }
     return ret;
 }
 
-static struct {
-    int (*func)(void);
-    int level;
-} optimizers[] = {
-        {dummy_goto, 1},
-        {redundant_goto, 1}, //dragon book 6.6.5
-        {dummy_label, 1},
-        {chain_assign, 1},
-        {chain_goto, 1}, //dragon book 8.7.3
-        {adj_label, 1},
-        {adj_arith, 999},
-        {const_eliminate, 1},
-        {remove_unreachable, 1}, //dragon book 8.7.2
-        {dummy_temp, 1},
-        {NULL, 0},
-};
 
 static inline ir* find_assign(operand op, ir* cur) {
     while(cur != &guard) {
@@ -1185,7 +1115,22 @@ void dummy_assign(ir* start, ir* end) {
 }
 
 void tot_optimize() {
-    (void)template;
+    static struct {
+        int (*func)(void);
+        int level;
+    } const optimizers[] = {
+        {dummy_goto, 1},
+        {redundant_goto, 1}, //dragon book 6.6.5
+        {dummy_label, 1},
+        {chain_assign, 1},
+        {chain_goto, 1}, //dragon book 8.7.3
+        {adj_label, 1},
+        {adj_arith, 999},
+        {const_eliminate, 1},
+        {remove_unreachable, 1}, //dragon book 8.7.2
+        {dummy_temp, 1},
+        {NULL, 0},
+    };
     int flag;
     do {
         flag = 0;
@@ -1197,30 +1142,29 @@ void tot_optimize() {
     } while(flag || (OPTIMIZE(2) && function_inline()));
 }
 
-static inline void predefined() {
-    const static char predefined_code[] =
-".data\n"
-"_prompt: .asciiz \"Enter an integer:\"\n"
-"_ret: .asciiz \"\\n\"\n"
-".globl main\n"
-".text\n"
-"read:\n"
-"  la $a0, _prompt\n"
-SYSCALL(sys_print_string)
-SYSCALL(sys_read_string)
-"  jr $ra\n"
-"\n"
-"write:\n"
-SYSCALL(sys_print_int)
-"  la $a0, _ret\n"
-SYSCALL(sys_print_string)
-"  move $v0, $0\n"
-"  jr $ra\n"
-"\n"
-"main:\n"
-"  jr f_main\n"
-;
-    output(predefined_code);
+void print_label_goto(label l) {
+    ir* cur_ir = new(ir);
+    cur_ir -> funcs = goto_ops;
+    cur_ir -> l = l;
+    ++l -> cnt;
+    add_ir(cur_ir);
+}
+
+void print_label(label l) {
+    ir* cur_ir = new(ir);
+    cur_ir -> funcs = label_ops;
+    cur_ir -> l = l;
+    add_ir(cur_ir);
+}
+
+void remove_ir(ir* i) {
+    Assert(i != &guard);
+    list_check(i);
+    i -> prev -> next = i -> next;
+    i -> next -> prev = i -> prev;
+    if(i -> funcs == goto_ops || i -> funcs == if_goto_ops) {
+        --(find(&i -> l) -> cnt);
+    }
 }
 
 void print_ir() {
@@ -1231,16 +1175,37 @@ void print_ir() {
     }
 }
 
+
 void print_mips() {
     new_scope();
-    predefined();
+    const static char predefined_code[] =
+    ".data\n"
+    "_prompt: .asciiz \"Enter an integer:\"\n"
+    "_ret: .asciiz \"\\n\"\n"
+    ".globl main\n"
+    ".text\n"
+    "read:\n"
+    "  la $a0, _prompt\n"
+    SYSCALL(sys_print_string)
+    SYSCALL(sys_read_string)
+    "  jr $ra\n"
+    "\n"
+    "write:\n"
+    SYSCALL(sys_print_int)
+    "  la $a0, _ret\n"
+    SYSCALL(sys_print_string)
+    "  move $v0, $0\n"
+    "  jr $ra\n"
+    "\n"
+    "main:\n"
+    "  jr f_main\n" ;
+    output(predefined_code);
     for(ir* i = guard.next; i != &guard; i = i->next) {
         Assert(i -> funcs);
         i->funcs->mips_format(i);
         reg_check();
-        //output("#");
-        //i->funcs->ir_format(i);
-        //output("\n");
+        i->funcs->ir_format(i);
+        output("\n");
     }
     free_scope();
 }

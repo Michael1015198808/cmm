@@ -4,9 +4,9 @@
 #include "type.h"
 #define CONTEXT_INFO 0
 #define INT_SIZE 4
+
 static int offset = CONTEXT_INFO;
 
-int output(const char* const fmt, ...);
 static void add_variable_real(operand op, int is_basic, unsigned size) {
     Type t = new(struct Type_);
     const char* const s = op_to_str(op);
@@ -18,9 +18,9 @@ static void add_variable_real(operand op, int is_basic, unsigned size) {
         } else {
             t->kind = OFFSET_COMP;
         }
-        //output("#%s from %d to ", s, offset);
+        //int output(const char* const fmt, ...);
+        //output("#%s from %d to %d\n", s, offset, offset-size);
         t->offset = (offset -= size);
-        //output("%d\n", offset);
         table_insert(s, t);
     }
 }
