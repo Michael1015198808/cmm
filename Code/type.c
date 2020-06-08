@@ -222,6 +222,8 @@ void type_clear(Type t) {
             break;
         case STRUCTURE:
         case BASIC:
+        case OFFSET_COMP:
+        case OFFSET_BASIC:
             return;
         default:
             panic();

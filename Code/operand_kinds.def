@@ -1,0 +1,9 @@
+#ifndef X
+_Static_assert(0, "Should define macro X before include this file!");
+#endif
+
+X(temp, TEMP)
+X(const, CONSTANT, int val)
+X(variable, VARIABLE, const char* name)
+X(address, ADDRESS, operand op)
+X(dummy, DUMMY)

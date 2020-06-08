@@ -18,7 +18,7 @@ extern CType type_int, type_float;
 
 struct Type_ {
     unsigned size;
-    enum {BASIC, ARRAY, STRUCTURE, STRUCTURE_DEF, FUNCTION, NOTYPE} kind;
+    enum {BASIC, ARRAY, STRUCTURE, STRUCTURE_DEF, FUNCTION, OFFSET_BASIC, OFFSET_COMP} kind;
     union {
         enum {T_INT, T_FLOAT} basic;
         struct {
@@ -32,6 +32,7 @@ struct Type_ {
             FieldList structure;
             int is_dec:1, has_read:1, has_goto:1;
         };
+        unsigned offset;
     };
 };
 
