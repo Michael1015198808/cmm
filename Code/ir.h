@@ -27,6 +27,7 @@ typedef struct label_* label;
 struct label_ {
     label parent;
     unsigned cnt, no;
+    unsigned visit;
 };
 typedef struct {
     printer ir_format, mips_format;

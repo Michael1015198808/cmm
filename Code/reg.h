@@ -11,5 +11,6 @@ void reg_use(int reg_idx);
 int find_op(operand op);
 void reg_free(int reg_idx);
 int tmp_reg();
+void reg_check();
 
 #endif //__REG_H__

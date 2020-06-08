@@ -590,6 +590,8 @@ make_mips_printer(fun_dec) {
     output("%s:\n", i -> val_str);
     new_function();
     ir* ins = i->next;
+    //Assert(args_cnt == 1);
+    args_cnt = 1;//add for security
     while(ins->funcs == param_ops) {
         ins = ins->next;
     }
@@ -850,11 +852,16 @@ static int adj_label() { //remove adjacent label
 //remove unreachable statements
 //e.g., statements after RETURN, GOTO
 static int remove_unreachable() {
+    static unsigned visit = 0;
+    ++visit;
     int ret = 0;
     for(ir* cur = guard.next; cur != &guard; cur = cur -> next) {
+        if(cur->funcs == if_goto_ops || cur->funcs == goto_ops) {
+            find(&cur->l)->visit = visit;
+        }
         if(cur -> funcs == return_ops || cur -> funcs == goto_ops) {
             for(ir* i = cur -> next; i != &guard; i = i -> next) {
-                if(i -> funcs == label_ops) {
+                if(i -> funcs == label_ops && find(&i->l)->visit == visit) {
                     break;
                 } else if(i -> funcs == fun_dec_ops) {
                     break;
@@ -1223,12 +1230,15 @@ void print_ir() {
 }
 
 void print_mips() {
+    new_scope();
     predefined();
     for(ir* i = guard.next; i != &guard; i = i->next) {
         Assert(i -> funcs);
         i->funcs->mips_format(i);
-        output("#");
-        i->funcs->ir_format(i);
-        output("\n");
+        reg_check();
+        //output("#");
+        //i->funcs->ir_format(i);
+        //output("\n");
     }
+    free_scope();
 }

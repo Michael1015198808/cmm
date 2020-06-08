@@ -18,7 +18,8 @@ static void load(operand op, int reg_idx) {
         output("  li $%d, %d\n", reg_idx, op->val_int);
     } else {
         if(op->kind == ADDRESS) {
-            output("  lw $%d, 0($%d)\n", reg_idx, reg(op->op));
+            int r = reg(op->op);
+            output("  lw $%d, 0($%d)\n", reg_idx, r);
         } else {
             const char *str = op_to_str(op);
             Type t = table_lookup(str);
@@ -38,6 +39,7 @@ static void spill(int reg_idx) {
         if(op->kind == ADDRESS) {
             int r1 = reg(op->op);
             output("  sw $%d, 0($%d)\n", reg_idx, r1);
+            reg_free(r1);
         } else {
             const char *str = op_to_str(reg_info[reg_idx]);
             Type t = table_lookup(str);
@@ -113,4 +115,13 @@ void reg_use(int reg_idx) {
     }
     is_using[reg_idx] = 1;
     reg_info[reg_idx] = NULL;
+}
+
+void reg_check() {
+    for(int i = 2; i < MAX_AVAIL; ++i) {
+        if(is_using[i]) {
+            Assert(0);
+        }
+        Assert(is_using[i] == 0);
+    }
 }

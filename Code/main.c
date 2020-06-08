@@ -27,7 +27,6 @@ int main(int argc, const char** argv) {
                 tot_optimize();
                 register_printf_operand();
                 //print_ir();
-                new_scope();
                 print_mips();
             }
 
